@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "eva": {
+      "command": "python",
+      "args": ["-m", "src.server"],
+      "cwd": "C:\\Users\\k.rerikh\\Repos\\personal\\eva-mcp-server",
+      "env": {
+        "EVA_API_URL": "https://eva.s7corp.ru/api",
+        "EVA_API_TOKEN": "d9x3DeanjaNeEpcvTs3w",
+        "EVA_READ_ONLY": "true",
+        "EVA_TIMEOUT": "30"
+      }
+    }
+  }
+}
+
