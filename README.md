@@ -1,5 +1,10 @@
 # Eva MCP Server
 
+[![CI](https://github.com/knrerikh/eva-mcp-server/workflows/CI/badge.svg)](https://github.com/knrerikh/eva-mcp-server/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
 MCP (Model Context Protocol) server for Eva-project API integration. This server allows AI assistants like Claude and Cursor to interact with Eva-project tasks, projects, documents, and more.
 
 > **Quick Start:** See [GETTING_STARTED.md](GETTING_STARTED.md) for step-by-step setup instructions.
@@ -27,7 +32,7 @@ MCP (Model Context Protocol) server for Eva-project API integration. This server
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/knrerikh/eva-mcp-server.git
 cd eva-mcp-server
 
 # Install dependencies
