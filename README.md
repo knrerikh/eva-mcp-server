@@ -50,7 +50,7 @@ Create a `.env` file in the project root (use `.env.example` as template):
 
 ```bash
 # Eva API Configuration
-EVA_API_URL=https://eva.s7corp.ru/api
+EVA_API_URL=https://your-eva-instance.com/api
 EVA_API_TOKEN=your_token_here
 
 # Optional: Enable read-only mode (default: true)
@@ -91,7 +91,7 @@ eva-mcp-server
     "command": "python",
     "args": ["/path/to/eva-mcp-server/src/server.py"],
     "env": {
-      "EVA_API_URL": "https://eva.s7corp.ru/api",
+      "EVA_API_URL": "https://your-eva-instance.com/api",
       "EVA_API_TOKEN": "your_token_here",
       "EVA_READ_ONLY": "true"
     }
@@ -113,7 +113,7 @@ Add to your Claude Desktop configuration file (`claude_desktop_config.json`):
       "command": "python",
       "args": ["/path/to/eva-mcp-server/src/server.py"],
       "env": {
-        "EVA_API_URL": "https://eva.s7corp.ru/api",
+        "EVA_API_URL": "https://your-eva-instance.com/api",
         "EVA_API_TOKEN": "your_token_here",
         "EVA_READ_ONLY": "true"
       }
@@ -344,7 +344,7 @@ eva-mcp-server/
 
 ## API Documentation
 
-For detailed API documentation, see [API_ANALYSIS.md](API_ANALYSIS.md).
+For detailed API documentation, refer to the Eva-project API documentation at your Eva instance.
 
 ## Contributing
 
@@ -365,7 +365,7 @@ MIT License - see LICENSE file for details.
 
 For issues and questions:
 - Open an issue on GitHub
-- Check Eva-project documentation: https://docs.evateam.ru/
+- Check Eva-project documentation at your Eva instance
 - Review the API specification in `oas_evateam_v1_9_22.json`
 
 ## Changelog

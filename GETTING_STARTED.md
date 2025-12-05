@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - Python 3.10 or higher
-- Access to Eva API (S7 corporate network or VPN)
+- Access to Eva API instance
 - Valid Eva API token
 
 ## Quick Setup
@@ -20,7 +20,7 @@ python -m pip install -r requirements.txt
 Create a `.env` file (optional, can also configure in Cursor):
 
 ```env
-EVA_API_URL=https://eva.s7corp.ru/api
+EVA_API_URL=https://your-eva-instance.com/api
 EVA_API_TOKEN=your_token_here
 EVA_READ_ONLY=true
 ```
@@ -41,7 +41,7 @@ Add this configuration:
         "C:\\absolute\\path\\to\\eva-mcp-server\\src\\server.py"
       ],
       "env": {
-        "EVA_API_URL": "https://eva.s7corp.ru/api",
+        "EVA_API_URL": "https://your-eva-instance.com/api",
         "EVA_API_TOKEN": "your_token_here",
         "EVA_READ_ONLY": "true"
       }
@@ -156,12 +156,12 @@ To enable write operations, set in configuration:
 ### API doesn't respond
 
 **Check:**
-1. Connected to VPN: `ping eva.s7corp.ru`
+1. Network connectivity to Eva instance
 2. Token is valid
 3. API URL is correct
 
 **Error:** `getaddrinfo failed` or `Cannot connect`
-- **Solution:** Connect to S7 corporate network or VPN
+- **Solution:** Verify network access to your Eva instance
 
 ### Tools don't appear in Cursor
 
@@ -174,7 +174,6 @@ To enable write operations, set in configuration:
 ## Next Steps
 
 - Read [Full Documentation](README.md)
-- Check [API Analysis](API_ANALYSIS.md)
 - See [Contributing Guide](CONTRIBUTING.md)
 
 ## Support

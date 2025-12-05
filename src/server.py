@@ -41,7 +41,7 @@ def initialize_client():
     
     try:
         # Get configuration from environment
-        api_url = os.getenv("EVA_API_URL", "https://eva.s7corp.ru/api")
+        api_url = os.getenv("EVA_API_URL", "https://your-eva-instance.com/api")
         api_token = os.getenv("EVA_API_TOKEN")
         read_only = os.getenv("EVA_READ_ONLY", "true").lower() == "true"
         

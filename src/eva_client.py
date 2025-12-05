@@ -44,7 +44,7 @@ class EvaClient:
             read_only: Enable read-only mode to prevent write operations (default: True)
             timeout: Request timeout in seconds (default: 30)
         """
-        self.api_url = api_url or os.getenv("EVA_API_URL", "https://eva.s7corp.ru/api")
+        self.api_url = api_url or os.getenv("EVA_API_URL", "https://your-eva-instance.com/api")
         self.api_token = api_token or os.getenv("EVA_API_TOKEN", "")
         self.read_only = read_only if read_only is not None else os.getenv("EVA_READ_ONLY", "true").lower() == "true"
         self.timeout = timeout or int(os.getenv("EVA_TIMEOUT", "30"))

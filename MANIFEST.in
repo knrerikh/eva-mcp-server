@@ -16,16 +16,11 @@ include .env.example
 
 # Include API specification
 include oas_evateam_v1_9_22.json
-include API_ANALYSIS.md
 
 # Exclude development and CI files
 exclude .gitignore
 exclude .gitattributes
 exclude .editorconfig
-exclude GITHUB_SETUP.md
-exclude PUBLISH_TO_GITHUB.md
-exclude PUBLISH_INSTRUCTIONS.md
-exclude PROJECT_STATUS.md
 exclude cursor_config.json
 exclude test_api_manual.py
 

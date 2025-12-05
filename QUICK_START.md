@@ -18,7 +18,7 @@ py -m pip install -r requirements.txt
 Create a `.env` file:
 
 ```env
-EVA_API_URL=https://eva.s7corp.ru/api
+EVA_API_URL=https://your-eva-instance.com/api
 EVA_API_TOKEN=your_token_here
 EVA_READ_ONLY=true
 ```
@@ -36,7 +36,7 @@ EVA_READ_ONLY=true
       "command": "py",
       "args": ["C:\\path\\to\\eva-mcp-server\\src\\server.py"],
       "env": {
-        "EVA_API_URL": "https://eva.s7corp.ru/api",
+        "EVA_API_URL": "https://your-eva-instance.com/api",
         "EVA_API_TOKEN": "your_token_here",
         "EVA_READ_ONLY": "true"
       }
@@ -102,7 +102,7 @@ EVA_READ_ONLY=false
 ## Requirements
 
 - Python 3.10+
-- Access to Eva API (S7 corporate network or VPN)
+- Access to Eva API instance
 - Valid API token
 
 ## Troubleshooting
@@ -113,7 +113,7 @@ EVA_READ_ONLY=false
 - Verify the path in configuration
 
 **API doesn't respond:**
-- Connect to corporate network/VPN
+- Verify network connectivity to Eva instance
 - Check API token
 - Verify `EVA_API_URL` is correct
 
@@ -126,5 +126,4 @@ EVA_READ_ONLY=false
 
 - [Full Documentation](README.md)
 - [Cursor Setup](SETUP_CURSOR.md)
-- [API Analysis](API_ANALYSIS.md)
 - [Contributing](CONTRIBUTING.md)

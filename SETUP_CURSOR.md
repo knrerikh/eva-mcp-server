@@ -35,7 +35,7 @@ EVA_TIMEOUT=30
         "C:\\path\\to\\eva-mcp-server\\src\\server.py"
       ],
       "env": {
-        "EVA_API_URL": "https://eva.s7corp.ru/api",
+        "EVA_API_URL": "https://your-eva-instance.com/api",
         "EVA_API_TOKEN": "your_token_here",
         "EVA_READ_ONLY": "true",
         "EVA_TIMEOUT": "30"
