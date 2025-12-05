@@ -10,9 +10,9 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
-    {name = "Konstantin Rerikh", email = "k.rerikh@s7.ru"}
+    {name = "Konstantin Rerikh", email = "knrerikh@gmail.com"}
 ]
-keywords = ["mcp", "eva", "eva-project", "api", "cursor"]
+keywords = ["mcp", "eva", "eva-project", "api", "cursor", "claude", "ai-assistant"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -21,7 +21,16 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Internet :: WWW/HTTP",
 ]
+
+[project.urls]
+Homepage = "https://github.com/knrerikh/eva-mcp-server"
+Documentation = "https://github.com/knrerikh/eva-mcp-server#readme"
+Repository = "https://github.com/knrerikh/eva-mcp-server"
+Issues = "https://github.com/knrerikh/eva-mcp-server/issues"
+Changelog = "https://github.com/knrerikh/eva-mcp-server/blob/master/CHANGELOG.md"
 
 dependencies = [
     "mcp>=1.0.0",

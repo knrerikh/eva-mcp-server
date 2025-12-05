@@ -1,0 +1,37 @@
+# Include documentation
+include README.md
+include LICENSE
+include CHANGELOG.md
+include CONTRIBUTING.md
+include CODE_OF_CONDUCT.md
+include GETTING_STARTED.md
+include QUICK_START.md
+include SETUP_CURSOR.md
+
+# Include configuration files
+include pyproject.toml
+include requirements.txt
+include pytest.ini
+include .env.example
+
+# Include API specification
+include oas_evateam_v1_9_22.json
+include API_ANALYSIS.md
+
+# Exclude development and CI files
+exclude .gitignore
+exclude .gitattributes
+exclude .editorconfig
+exclude GITHUB_SETUP.md
+exclude PUBLISH_TO_GITHUB.md
+exclude PUBLISH_INSTRUCTIONS.md
+exclude PROJECT_STATUS.md
+exclude cursor_config.json
+exclude test_api_manual.py
+
+# Exclude directories
+recursive-exclude .github *
+recursive-exclude tests *
+recursive-exclude __pycache__ *
+recursive-exclude *.egg-info *
+
