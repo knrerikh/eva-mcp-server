@@ -43,7 +43,8 @@ def initialize_client():
         # Get configuration from environment
         api_url = os.getenv("EVA_API_URL", "https://your-eva-instance.com/api")
         api_token = os.getenv("EVA_API_TOKEN")
-        read_only = os.getenv("EVA_READ_ONLY", "true").lower() == "true"
+        # По умолчанию запись разрешена (false), явно укажите "true" для read-only режима
+        read_only = os.getenv("EVA_READ_ONLY", "false").lower() == "true"
         
         logger.info(f"Initializing Eva MCP Server...")
         logger.info(f"API URL: {api_url}")
@@ -117,17 +118,22 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="eva_create_task",
-            description="Create a new task (WARNING: write operation, requires read_only=False)",
+            description="Create a new task (WARNING: write operation, requires read_only=False). For tasks in sprints, provide BOTH project_code and lists for proper linking.",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "name": {"type": "string", "description": "Task name/title"},
-                    "project_code": {"type": "string", "description": "Parent project code"},
+                    "project_code": {"type": "string", "description": "Parent project code. Required for sprint tasks to properly link to project."},
+                    "lists": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of sprint/list codes to add task to (e.g., ['SPR-000929']). Use with project_code for proper linking."
+                    },
                     "description": {"type": "string", "description": "Task description (HTML)"},
                     "responsible": {"type": "string", "description": "Responsible user email/login"},
                     "priority": {"type": "integer", "description": "Task priority (0-5)"},
                 },
-                "required": ["name", "project_code"],
+                "required": ["name"],
             },
         ),
         Tool(

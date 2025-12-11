@@ -145,7 +145,8 @@ class EvaTools:
     def create_task(
         self,
         name: str,
-        project_code: str,
+        project_code: Optional[str] = None,
+        lists: Optional[List[str]] = None,
         description: Optional[str] = None,
         responsible: Optional[str] = None,
         priority: Optional[int] = None,
@@ -157,10 +158,16 @@ class EvaTools:
         
         Args:
             name: Task name/title
-            project_code: Parent project code
+            project_code: Parent project code (optional)
+            lists: List of sprint/list codes to add task to (e.g., ['SPR-000929'])
             description: Task description (HTML)
             responsible: Responsible user email/login
             priority: Task priority (0-5)
+            
+        Note:
+            - For tasks in projects: specify only project_code
+            - For tasks in sprints: specify BOTH project_code and lists
+            - If only lists is provided, task will be created but not linked to project
             
         Returns:
             JSON string with created task details
@@ -175,6 +182,7 @@ class EvaTools:
             task = self.client.create_task(
                 name=name,
                 parent=project_code,
+                lists=lists,
                 responsible=responsible,
                 **kwargs
             )

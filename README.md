@@ -18,7 +18,7 @@ MCP (Model Context Protocol) server for Eva-project API integration. This server
 - **Comments**: View and add comments to tasks/documents
 - **Sprint Management**: List and view sprints/lists
 - **Audit Log**: View audit history
-- **Read-Only Mode**: Safe mode that prevents write operations (enabled by default)
+- **Read-Only Mode**: Optional safe mode that prevents write operations (disabled by default for convenience)
 - **JSON-RPC 2.0**: Full support for Eva API protocol
 
 ## Installation
@@ -53,8 +53,9 @@ Create a `.env` file in the project root (use `.env.example` as template):
 EVA_API_URL=https://your-eva-instance.com/api
 EVA_API_TOKEN=your_token_here
 
-# Optional: Enable read-only mode (default: true)
-EVA_READ_ONLY=true
+# Optional: Enable read-only mode (default: false - write operations allowed)
+# Set to "true" to prevent write operations
+EVA_READ_ONLY=false
 
 # Optional: Request timeout in seconds (default: 30)
 EVA_TIMEOUT=30
@@ -92,8 +93,7 @@ eva-mcp-server
     "args": ["/path/to/eva-mcp-server/src/server.py"],
     "env": {
       "EVA_API_URL": "https://your-eva-instance.com/api",
-      "EVA_API_TOKEN": "your_token_here",
-      "EVA_READ_ONLY": "true"
+      "EVA_API_TOKEN": "your_token_here"
     }
   }
 }
@@ -101,6 +101,34 @@ eva-mcp-server
 
 4. Restart Cursor
 5. The Eva MCP server should now be available
+
+### Optional: Enabling Read-Only Mode for Safety
+
+By default, write operations are **allowed**. If you want to protect your Eva instance from accidental modifications (e.g., for production environments or analytics), you can enable read-only mode:
+
+1. Open Cursor Settings (Ctrl+Shift+P → "Preferences: Open Settings (JSON)")
+2. Find the Eva MCP server configuration in the `mcpServers` section
+3. Add `"EVA_READ_ONLY": "true"` in the `env` section:
+
+```json
+{
+  "mcpServers": {
+    "Eva Project MCP": {
+      "command": "python",
+      "args": ["C:\\Users\\YourUser\\Repos\\eva-mcp-server\\src\\server.py"],
+      "env": {
+        "EVA_API_URL": "https://eva.s7corp.ru/api",
+        "EVA_API_TOKEN": "your_token",
+        "EVA_READ_ONLY": "true"
+      }
+    }
+  }
+}
+```
+
+4. Save the configuration file
+5. Restart Cursor
+6. The Eva MCP server will now block all write operations
 
 ### Integration with Claude Desktop
 
@@ -114,8 +142,7 @@ Add to your Claude Desktop configuration file (`claude_desktop_config.json`):
       "args": ["/path/to/eva-mcp-server/src/server.py"],
       "env": {
         "EVA_API_URL": "https://your-eva-instance.com/api",
-        "EVA_API_TOKEN": "your_token_here",
-        "EVA_READ_ONLY": "true"
+        "EVA_API_TOKEN": "your_token_here"
       }
     }
   }
@@ -136,7 +163,11 @@ Add to your Claude Desktop configuration file (`claude_desktop_config.json`):
   - Parameters: `project`, `responsible`, `status`
   
 - **eva_create_task**: Create a new task (requires `read_only=false`)
-  - Parameters: `name`, `project_code`, `description`, `responsible`, `priority`
+  - Parameters: `name`, `project_code` (optional), `lists` (optional), `description`, `responsible`, `priority`
+  - **Important**: 
+    - For tasks in projects: specify only `project_code`
+    - For tasks in sprints: specify **both** `project_code` (sprint's parent project) and `lists` (sprint codes)
+    - If only `lists` is provided, task will be created but won't be properly linked to a project
   
 - **eva_update_task**: Update an existing task (requires `read_only=false`)
   - Parameters: `task_code`, `name`, `description`, `responsible`, `status`, `priority`
@@ -185,6 +216,32 @@ Add to your Claude Desktop configuration file (`claude_desktop_config.json`):
 
 - **eva_get_audit_log**: Get audit log entries
   - Parameters: `entity_code`, `limit`
+
+## Best Practices
+
+### Creating Tasks
+
+**For project tasks (no sprint):**
+```json
+{
+  "name": "Task name",
+  "project_code": "PROJ-123"
+}
+```
+
+**For sprint tasks (recommended):**
+```json
+{
+  "name": "Task name",
+  "project_code": "CmfProject:xxx",  // Sprint's parent project
+  "lists": ["SPR-000929"]             // Sprint code
+}
+```
+
+**Why both parameters?**
+- Using only `lists` will add the task to the sprint, but it won't be linked to the project hierarchy
+- Using both `project_code` and `lists` ensures proper linking in both the project tree and sprint board
+- This matches the behavior of the Eva web interface
 
 ## Examples
 
@@ -240,20 +297,38 @@ This will call `eva_create_task` with:
 }
 ```
 
+### Example 5: Create a task in a sprint/list (recommended approach)
+
+```python
+"Create a new task named 'Fix bug in authentication' in sprint SPR-000929"
+```
+
+This will call `eva_create_task` with:
+```json
+{
+  "name": "Fix bug in authentication",
+  "project_code": "CmfProject:xxx",
+  "lists": ["SPR-000929"]
+}
+```
+
+**Note**: It's recommended to specify both `project_code` (the sprint's parent project) and `lists` to properly link the task to both the project and the sprint. If only `lists` is provided, the task will be added to the sprint but won't be linked to the project hierarchy.
+
 ## Safety and Security
 
 ### Read-Only Mode
 
-By default, the server runs in read-only mode (`EVA_READ_ONLY=true`). This prevents:
-- Creating tasks
-- Updating tasks
-- Adding comments
-- Any other write operations
+By default, the server allows write operations (`EVA_READ_ONLY=false`) for convenient usage. 
 
-To enable write operations:
-1. Set `EVA_READ_ONLY=false` in your configuration
-2. Be cautious when using write operations on production data
-3. Always verify the operation before confirming
+To enable read-only mode for safety (e.g., for production environments):
+1. Set `EVA_READ_ONLY=true` in your configuration
+2. This will prevent:
+   - Creating tasks
+   - Updating tasks
+   - Adding comments
+   - Any other write operations
+
+**Recommendation**: Use read-only mode when you only need to analyze data or when multiple users share the same configuration.
 
 ### API Token Security
 
