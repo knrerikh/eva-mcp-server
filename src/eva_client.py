@@ -32,7 +32,7 @@ class EvaClient:
         self,
         api_url: Optional[str] = None,
         api_token: Optional[str] = None,
-        read_only: bool = True,
+        read_only: Optional[bool] = None,
         timeout: int = 30,
     ):
         """
@@ -41,7 +41,7 @@ class EvaClient:
         Args:
             api_url: Eva API base URL (default: from EVA_API_URL env var)
             api_token: API authentication token (default: from EVA_API_TOKEN env var)
-            read_only: Enable read-only mode to prevent write operations (default: True)
+            read_only: Enable read-only mode to prevent write operations (default: from EVA_READ_ONLY env var, fallback to False)
             timeout: Request timeout in seconds (default: 30)
         """
         self.api_url = api_url or os.getenv("EVA_API_URL", "https://your-eva-instance.com/api")
