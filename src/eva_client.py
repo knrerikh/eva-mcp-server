@@ -46,7 +46,8 @@ class EvaClient:
         """
         self.api_url = api_url or os.getenv("EVA_API_URL", "https://your-eva-instance.com/api")
         self.api_token = api_token or os.getenv("EVA_API_TOKEN", "")
-        self.read_only = read_only if read_only is not None else os.getenv("EVA_READ_ONLY", "true").lower() == "true"
+        # По умолчанию запись разрешена (false), явно укажите "true" для read-only режима
+        self.read_only = read_only if read_only is not None else os.getenv("EVA_READ_ONLY", "false").lower() == "true"
         self.timeout = timeout or int(os.getenv("EVA_TIMEOUT", "30"))
         
         if not self.api_token:
@@ -191,16 +192,19 @@ class EvaClient:
     def create_task(
         self,
         name: str,
-        parent: str,
+        parent: Optional[str] = None,
+        lists: Optional[List[str]] = None,
         text: Optional[str] = None,
         responsible: Optional[str] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """Create a new task."""
-        params = {
-            "name": name,
-            "parent": parent,
-        }
+        params = {"name": name}
+        
+        if parent:
+            params["parent"] = parent
+        if lists:
+            params["lists"] = lists
         if text:
             params["text"] = text
         if responsible:
