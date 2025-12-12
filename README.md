@@ -117,7 +117,7 @@ By default, write operations are **allowed**. If you want to protect your Eva in
       "command": "python",
       "args": ["C:\\Users\\YourUser\\Repos\\eva-mcp-server\\src\\server.py"],
       "env": {
-        "EVA_API_URL": "https://eva.s7corp.ru/api",
+        "EVA_API_URL": "https://your-eva-instance.com/api",
         "EVA_API_TOKEN": "your_token",
         "EVA_READ_ONLY": "true"
       }
@@ -211,6 +211,9 @@ Add to your Claude Desktop configuration file (`claude_desktop_config.json`):
   
 - **eva_get_sprint**: Get detailed sprint/list information
   - Parameters: `list_code`
+  
+- **eva_create_list**: Create a new list/sprint/release (requires `read_only=false`)
+  - Parameters: `name`, `project_code`
 
 ### Audit Tools
 

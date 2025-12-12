@@ -272,6 +272,18 @@ async def list_tools() -> list[Tool]:
                 "required": ["list_code"],
             },
         ),
+        Tool(
+            name="eva_create_list",
+            description="Create a new list/sprint/release (WARNING: write operation, requires read_only=False)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "List name/title"},
+                    "project_code": {"type": "string", "description": "Parent project code (e.g., CmfProject:...)"},
+                },
+                "required": ["name", "project_code"],
+            },
+        ),
         
         # Audit tools
         Tool(
@@ -311,6 +323,7 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
             "eva_add_comment": eva_tools.add_comment,
             "eva_list_sprints": eva_tools.list_sprints,
             "eva_get_sprint": eva_tools.get_sprint_details,
+            "eva_create_list": eva_tools.create_list,
             "eva_get_audit_log": eva_tools.get_audit_log,
         }
         

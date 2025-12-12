@@ -12,7 +12,7 @@ py -m pip install -r requirements.txt
 Create a `.env` file in the `eva-mcp-server` directory:
 
 ```env
-EVA_API_URL=https://eva.s7corp.ru/api
+EVA_API_URL=https://your-eva-instance.com/api
 EVA_API_TOKEN=your_token_here
 EVA_READ_ONLY=true
 EVA_TIMEOUT=30
@@ -82,7 +82,7 @@ Try in Cursor:
 
 ### API requests don't work
 
-1. Make sure you're connected to S7 corporate network (VPN)
+1. Make sure you're connected to your Eva instance network
 2. Verify that `EVA_API_TOKEN` is valid
 3. Check server logs
 
