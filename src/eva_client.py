@@ -32,7 +32,7 @@ class EvaClient:
         self,
         api_url: Optional[str] = None,
         api_token: Optional[str] = None,
-        read_only: bool = True,
+        read_only: Optional[bool] = None,
         timeout: int = 30,
     ):
         """
@@ -41,13 +41,13 @@ class EvaClient:
         Args:
             api_url: Eva API base URL (default: from EVA_API_URL env var)
             api_token: API authentication token (default: from EVA_API_TOKEN env var)
-            read_only: Enable read-only mode to prevent write operations (default: True)
+            read_only: Enable read-only mode to prevent write operations (default: from EVA_READ_ONLY env var or True if not set)
             timeout: Request timeout in seconds (default: 30)
         """
         self.api_url = api_url or os.getenv("EVA_API_URL", "https://your-eva-instance.com/api")
         self.api_token = api_token or os.getenv("EVA_API_TOKEN", "")
-        # По умолчанию запись разрешена (false), явно укажите "true" для read-only режима
-        self.read_only = read_only if read_only is not None else os.getenv("EVA_READ_ONLY", "false").lower() == "true"
+        # По умолчанию read-only режим включен (true), если не указано явно или через EVA_READ_ONLY
+        self.read_only = read_only if read_only is not None else os.getenv("EVA_READ_ONLY", "true").lower() == "true"
         self.timeout = timeout or int(os.getenv("EVA_TIMEOUT", "30"))
         
         if not self.api_token:
