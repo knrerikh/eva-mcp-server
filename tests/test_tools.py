@@ -159,6 +159,51 @@ def test_list_sprints_success(eva_tools, mock_client):
     assert result_data["count"] == 1
 
 
+def test_create_list_success(eva_tools, mock_client):
+    """Test creating list/sprint/release."""
+    mock_client.create_list.return_value = {
+        "code": "SPR-1",
+        "name": "Sprint 1",
+        "parent": "CmfProject:proj"
+    }
+    
+    result = eva_tools.create_list(name="Sprint 1", project_code="CmfProject:proj")
+    result_data = json.loads(result)
+    
+    assert result_data["success"] is True
+    assert result_data["list"]["code"] == "SPR-1"
+    mock_client.create_list.assert_called_once_with(name="Sprint 1", parent="CmfProject:proj")
+
+
+def test_create_list_error(eva_tools, mock_client):
+    """Test creating list with error."""
+    mock_client.create_list.side_effect = EvaAPIError("API Error", code=-32600)
+    
+    result = eva_tools.create_list(name="Sprint 1", project_code="CmfProject:proj")
+    result_data = json.loads(result)
+    
+    assert result_data["success"] is False
+    assert "API Error" in result_data["error"]
+
+
+def test_create_list_validation_empty_name(eva_tools, mock_client):
+    """Test creating list with empty name."""
+    result = eva_tools.create_list(name="", project_code="CmfProject:proj")
+    result_data = json.loads(result)
+    
+    assert result_data["success"] is False
+    assert "required" in result_data["error"].lower()
+
+
+def test_create_list_validation_empty_project(eva_tools, mock_client):
+    """Test creating list with empty project_code."""
+    result = eva_tools.create_list(name="Sprint 1", project_code="")
+    result_data = json.loads(result)
+    
+    assert result_data["success"] is False
+    assert "required" in result_data["error"].lower()
+
+
 def test_get_audit_log_success(eva_tools, mock_client):
     """Test getting audit log."""
     mock_client.list_audit.return_value = [

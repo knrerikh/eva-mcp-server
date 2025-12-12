@@ -526,6 +526,46 @@ class EvaTools:
                 "code": e.code
             }, ensure_ascii=False, indent=2)
     
+    def create_list(self, name: str, project_code: str) -> str:
+        """
+        Create a new list (sprint/release/list) in Eva under a project.
+        
+        WARNING: This is a write operation. Requires read_only=False.
+        NOTE: API schema (oas) exposes only 'name' and 'parent', so list type is determined by Eva side.
+        
+        Args:
+            name: List name/title
+            project_code: Parent project code (e.g., CmfProject:...)
+            
+        Returns:
+            JSON string with created list details
+        """
+        try:
+            if not name or not name.strip():
+                raise ValueError("name is required")
+            if not project_code or not project_code.strip():
+                raise ValueError("project_code is required")
+            
+            created = self.client.create_list(name=name, parent=project_code)
+            
+            return json.dumps({
+                "success": True,
+                "list": created,
+                "message": "List created successfully"
+            }, ensure_ascii=False, indent=2)
+            
+        except (EvaAPIError, ValueError) as e:
+            if isinstance(e, EvaAPIError):
+                return json.dumps({
+                    "success": False,
+                    "error": e.message,
+                    "code": e.code
+                }, ensure_ascii=False, indent=2)
+            return json.dumps({
+                "success": False,
+                "error": str(e)
+            }, ensure_ascii=False, indent=2)
+    
     def get_sprint_details(self, list_code: str) -> str:
         """
         Get detailed information about a specific sprint/list.

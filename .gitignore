@@ -61,3 +61,6 @@ test_api_manual.py
 
 # MCP specific
 .mcp/
+
+# Project specific rules
+EVA_TASK_RULES.md

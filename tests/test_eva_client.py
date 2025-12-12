@@ -53,6 +53,12 @@ def test_read_only_protection(mock_client):
         mock_client.create_task(name="Test", parent="project")
 
 
+def test_read_only_protection_create_list(mock_client):
+    """Test that list creation is blocked in read-only mode."""
+    with pytest.raises(EvaAPIError, match="read-only mode"):
+        mock_client.create_list(name="List 1", parent="CmfProject:proj")
+
+
 def test_generate_callid(mock_client):
     """Test call ID generation."""
     callid = mock_client._generate_callid()

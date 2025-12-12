@@ -41,13 +41,13 @@ class EvaClient:
         Args:
             api_url: Eva API base URL (default: from EVA_API_URL env var)
             api_token: API authentication token (default: from EVA_API_TOKEN env var)
-            read_only: Enable read-only mode to prevent write operations (default: from EVA_READ_ONLY env var, fallback to False)
+            read_only: Enable read-only mode to prevent write operations (default: from EVA_READ_ONLY env var or True if not set)
             timeout: Request timeout in seconds (default: 30)
         """
         self.api_url = api_url or os.getenv("EVA_API_URL", "https://your-eva-instance.com/api")
         self.api_token = api_token or os.getenv("EVA_API_TOKEN", "")
-        # По умолчанию запись разрешена (false), явно укажите "true" для read-only режима
-        self.read_only = read_only if read_only is not None else os.getenv("EVA_READ_ONLY", "false").lower() == "true"
+        # По умолчанию read-only режим включен (true), если не указано явно или через EVA_READ_ONLY
+        self.read_only = read_only if read_only is not None else os.getenv("EVA_READ_ONLY", "true").lower() == "true"
         self.timeout = timeout or int(os.getenv("EVA_TIMEOUT", "30"))
         
         if not self.api_token:
@@ -317,6 +317,15 @@ class EvaClient:
     def get_list(self, code: str) -> Dict[str, Any]:
         """Get list/sprint by code."""
         return self.call("CmfList.get", code=code)
+    
+    def create_list(self, name: str, parent: str, **kwargs) -> Dict[str, Any]:
+        """Create a new list/sprint under a project.
+
+        NOTE: This is a write operation and will be blocked when read_only=True.
+        """
+        params = {"name": name, "parent": parent}
+        params.update(kwargs)
+        return self.call("CmfList.create", **params)
     
     def list_lists(
         self,
