@@ -1,6 +1,7 @@
 """Eva MCP Server - Main server implementation using MCP SDK."""
 
 import asyncio
+import json
 import logging
 import os
 import sys
@@ -439,8 +440,11 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
         return [TextContent(type="text", text=result)]
 
     except Exception as e:
-        logger.error(f"Error calling tool {name}: {e}")
-        error_result = f'{{"success": false, "error": "{e!s}"}}'
+        logger.exception("Error calling tool %s", name)
+        # Built with json.dumps rather than interpolation: Eva error text carries
+        # quotes and newlines, and interpolating those produces a payload the
+        # client cannot parse — it sees a broken response instead of the error.
+        error_result = json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
         return [TextContent(type="text", text=error_result)]
 
 
