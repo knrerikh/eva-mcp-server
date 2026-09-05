@@ -1,9 +1,10 @@
 """Eva API Client - HTTP client for Eva-project API."""
 
 import os
+import re
 import uuid
 import logging
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional, List, Sequence, Tuple, Union
 from datetime import datetime
 
 import httpx
@@ -13,6 +14,16 @@ from dotenv import load_dotenv
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
+# Eva addresses every entity by an internal identifier of the form "CmfTask:<uuid>".
+# Human-readable codes (task codes, project codes, logins) are a separate namespace
+# and most filters and all update methods reject them.
+ENTITY_ID_RE = re.compile(r"^Cmf[A-Za-z]+:[0-9a-fA-F-]{8,}$")
+
+
+def is_entity_id(value: Any) -> bool:
+    """True if the value already is an Eva entity identifier."""
+    return isinstance(value, str) and bool(ENTITY_ID_RE.match(value))
 
 
 class EvaAPIError(Exception):
@@ -62,29 +73,43 @@ class EvaClient:
             follow_redirects=False,
         )
         
+        # Resolved code -> entity id, so repeated filters cost one lookup, not many
+        self._id_cache: Dict[Tuple[str, Tuple[str, ...]], str] = {}
+
         logger.info(f"Eva client initialized (read_only={self.read_only}, url={self.api_url})")
     
     def _generate_callid(self) -> str:
         """Generate a unique call ID for JSON-RPC request."""
         return str(uuid.uuid4())
     
-    def _build_request(self, method: str, kwargs: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def _build_request(
+        self,
+        method: str,
+        kwargs: Optional[Dict[str, Any]] = None,
+        args: Optional[Sequence[Any]] = None,
+    ) -> Dict[str, Any]:
         """
         Build JSON-RPC 2.0 request.
-        
+
         Args:
             method: API method name (e.g., "CmfTask.get")
             kwargs: Method parameters
-            
+            args: Positional parameters. Update methods take the entity
+                identifier here — Eva answers "Необходимо указать id в args[0]"
+                when it is missing.
+
         Returns:
             JSON-RPC request dictionary
         """
-        return {
+        request = {
             "jsonrpc": "2.2",
             "method": method,
             "callid": self._generate_callid(),
             "kwargs": kwargs or {},
         }
+        if args:
+            request["args"] = list(args)
+        return request
     
     def _check_write_operation(self, method: str) -> None:
         """
@@ -105,25 +130,26 @@ class EvaClient:
                 code=-32001
             )
     
-    def call(self, method: str, **kwargs) -> Any:
+    def call(self, method: str, *args, **kwargs) -> Any:
         """
         Make a JSON-RPC API call.
-        
+
         Args:
             method: API method name (e.g., "CmfTask.get")
+            *args: Positional parameters (entity identifier for update methods)
             **kwargs: Method parameters
-            
+
         Returns:
             API response result
-            
+
         Raises:
             EvaAPIError: If API returns an error or request fails
         """
         self._check_write_operation(method)
-        
-        request_data = self._build_request(method, kwargs)
-        
-        logger.debug(f"API call: {method} with params: {kwargs}")
+
+        request_data = self._build_request(method, kwargs, args=args)
+
+        logger.debug(f"API call: {method} with args: {args}, params: {kwargs}")
         
         try:
             # Method is added as query parameter in URL
@@ -155,6 +181,61 @@ class EvaClient:
             logger.error(f"Unexpected error: {e}")
             raise EvaAPIError(f"Unexpected error: {str(e)}")
     
+    def resolve_id(
+        self,
+        code: Any,
+        entity: Union[str, Sequence[str]] = "CmfTask",
+    ) -> str:
+        """
+        Resolve a human-readable code to the internal Eva identifier.
+
+        Eva stores relations as ``CmfTask:<uuid>``. Passing a code such as a task
+        code, a project code or a login into a filter matches nothing and returns
+        an empty result without an error, so every relation filter and every
+        update has to resolve first.
+
+        Args:
+            code: Human-readable code, or an identifier (returned unchanged)
+            entity: Entity class to look up, or several to try in order —
+                a comment parent, for instance, may be a task or a document
+
+        Returns:
+            Entity identifier
+
+        Raises:
+            EvaAPIError: If the code cannot be resolved
+        """
+        if is_entity_id(code):
+            return code
+
+        if not code or not str(code).strip():
+            raise EvaAPIError("Cannot resolve an empty code to an entity id")
+
+        code = str(code).strip()
+        entities: Tuple[str, ...] = (entity,) if isinstance(entity, str) else tuple(entity)
+
+        cache_key = (code, entities)
+        if cache_key in self._id_cache:
+            return self._id_cache[cache_key]
+
+        last_error: Optional[EvaAPIError] = None
+        for entity_name in entities:
+            try:
+                found = self.call(f"{entity_name}.get", code=code, fields=["id", "code"])
+            except EvaAPIError as e:
+                last_error = e
+                continue
+            entity_id = (found or {}).get("id")
+            if entity_id:
+                self._id_cache[cache_key] = entity_id
+                return entity_id
+
+        raise EvaAPIError(
+            f"Cannot resolve '{code}' to a {'/'.join(entities)} id"
+            + (f": {last_error.message}" if last_error else ""),
+            code=last_error.code if last_error else None,
+        )
+
     # Task operations
     def get_task(
         self,
@@ -209,10 +290,7 @@ class EvaClient:
 
         Filter must use list entity id (CmfList:uuid), not human-readable code.
         """
-        list_meta = self.get_list(list_code)
-        list_id = list_meta.get("id")
-        if not list_id:
-            raise EvaAPIError(f"List '{list_code}' has no id in Eva response")
+        list_id = self.resolve_id(list_code, "CmfList")
 
         params: Dict[str, Any] = {
             "filter": [["lists", "IN", [list_id]]],
@@ -247,8 +325,15 @@ class EvaClient:
         return self.call("CmfTask.create", **params)
     
     def update_task(self, code: str, **kwargs) -> Dict[str, Any]:
-        """Update an existing task."""
-        return self.call("CmfTask.update", code=code, **kwargs)
+        """
+        Update an existing task.
+
+        The identifier goes in ``args[0]`` — Eva rejects it both as a keyword
+        argument and as a human-readable code in ``args[0]``, so it is resolved
+        to an entity id first.
+        """
+        task_id = self.resolve_id(code, "CmfTask")
+        return self.call("CmfTask.update", task_id, **kwargs)
     
     # Project operations
     def get_project(self, code: str) -> Dict[str, Any]:
