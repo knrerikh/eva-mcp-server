@@ -1,11 +1,11 @@
 """Eva API Client - HTTP client for Eva-project API."""
 
+import logging
 import os
 import re
 import uuid
-import logging
-from typing import Any, Dict, Optional, List, Sequence, Tuple, Union
-from datetime import datetime
+from collections.abc import Sequence
+from typing import Any
 
 import httpx
 from dotenv import load_dotenv
@@ -28,8 +28,8 @@ def is_entity_id(value: Any) -> bool:
 
 class EvaAPIError(Exception):
     """Base exception for Eva API errors."""
-    
-    def __init__(self, message: str, code: Optional[int] = None, details: Optional[Dict] = None):
+
+    def __init__(self, message: str, code: int | None = None, details: dict | None = None):
         self.message = message
         self.code = code
         self.details = details or {}
@@ -38,17 +38,17 @@ class EvaAPIError(Exception):
 
 class EvaClient:
     """Client for interacting with Eva-project API using JSON-RPC 2.0."""
-    
+
     def __init__(
         self,
-        api_url: Optional[str] = None,
-        api_token: Optional[str] = None,
-        read_only: Optional[bool] = None,
+        api_url: str | None = None,
+        api_token: str | None = None,
+        read_only: bool | None = None,
         timeout: int = 30,
     ):
         """
         Initialize Eva API client.
-        
+
         Args:
             api_url: Eva API base URL (default: from EVA_API_URL env var)
             api_token: API authentication token (default: from EVA_API_TOKEN env var)
@@ -58,12 +58,16 @@ class EvaClient:
         self.api_url = api_url or os.getenv("EVA_API_URL", "https://your-eva-instance.com/api")
         self.api_token = api_token or os.getenv("EVA_API_TOKEN", "")
         # По умолчанию read-only режим включен (true), если не указано явно или через EVA_READ_ONLY
-        self.read_only = read_only if read_only is not None else os.getenv("EVA_READ_ONLY", "true").lower() == "true"
+        self.read_only = (
+            read_only
+            if read_only is not None
+            else os.getenv("EVA_READ_ONLY", "true").lower() == "true"
+        )
         self.timeout = timeout or int(os.getenv("EVA_TIMEOUT", "30"))
-        
+
         if not self.api_token:
             raise ValueError("API token is required. Set EVA_API_TOKEN environment variable.")
-        
+
         self.client = httpx.Client(
             timeout=self.timeout,
             headers={
@@ -72,22 +76,22 @@ class EvaClient:
             },
             follow_redirects=False,
         )
-        
+
         # Resolved code -> entity id, so repeated filters cost one lookup, not many
-        self._id_cache: Dict[Tuple[str, Tuple[str, ...]], str] = {}
+        self._id_cache: dict[tuple[str, tuple[str, ...]], str] = {}
 
         logger.info(f"Eva client initialized (read_only={self.read_only}, url={self.api_url})")
-    
+
     def _generate_callid(self) -> str:
         """Generate a unique call ID for JSON-RPC request."""
         return str(uuid.uuid4())
-    
+
     def _build_request(
         self,
         method: str,
-        kwargs: Optional[Dict[str, Any]] = None,
-        args: Optional[Sequence[Any]] = None,
-    ) -> Dict[str, Any]:
+        kwargs: dict[str, Any] | None = None,
+        args: Sequence[Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Build JSON-RPC 2.0 request.
 
@@ -110,26 +114,26 @@ class EvaClient:
         if args:
             request["args"] = list(args)
         return request
-    
+
     def _check_write_operation(self, method: str) -> None:
         """
         Check if write operation is allowed.
-        
+
         Args:
             method: API method name
-            
+
         Raises:
             EvaAPIError: If write operation is attempted in read-only mode
         """
         write_operations = ["create", "update", "delete", "append", "set_", "do_"]
-        
+
         if self.read_only and any(op in method.lower() for op in write_operations):
             raise EvaAPIError(
                 f"Write operation '{method}' is not allowed in read-only mode. "
                 "Set read_only=False to enable write operations.",
-                code=-32001
+                code=-32001,
             )
-    
+
     def call(self, method: str, *args, **kwargs) -> Any:
         """
         Make a JSON-RPC API call.
@@ -150,41 +154,41 @@ class EvaClient:
         request_data = self._build_request(method, kwargs, args=args)
 
         logger.debug(f"API call: {method} with args: {args}, params: {kwargs}")
-        
+
         try:
             # Method is added as query parameter in URL
             url_with_method = f"{self.api_url}/?m={method}"
             response = self.client.post(url_with_method, json=request_data)
             response.raise_for_status()
-            
+
             result = response.json()
-            
+
             # Check for JSON-RPC error
             if "error" in result:
                 error = result["error"]
                 raise EvaAPIError(
                     message=error.get("message", "Unknown error"),
                     code=error.get("code"),
-                    details=error
+                    details=error,
                 )
-            
+
             logger.debug(f"API call successful: {method}")
             return result.get("result")
-            
+
         except httpx.HTTPStatusError as e:
             logger.error(f"HTTP error: {e}")
             raise EvaAPIError(f"HTTP error: {e.response.status_code}", details={"response": str(e)})
         except httpx.RequestError as e:
             logger.error(f"Request error: {e}")
-            raise EvaAPIError(f"Request error: {str(e)}")
+            raise EvaAPIError(f"Request error: {e!s}")
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
-            raise EvaAPIError(f"Unexpected error: {str(e)}")
-    
+            raise EvaAPIError(f"Unexpected error: {e!s}")
+
     def resolve_id(
         self,
         code: Any,
-        entity: Union[str, Sequence[str]] = "CmfTask",
+        entity: str | Sequence[str] = "CmfTask",
     ) -> str:
         """
         Resolve a human-readable code to the internal Eva identifier.
@@ -212,13 +216,13 @@ class EvaClient:
             raise EvaAPIError("Cannot resolve an empty code to an entity id")
 
         code = str(code).strip()
-        entities: Tuple[str, ...] = (entity,) if isinstance(entity, str) else tuple(entity)
+        entities: tuple[str, ...] = (entity,) if isinstance(entity, str) else tuple(entity)
 
         cache_key = (code, entities)
         if cache_key in self._id_cache:
             return self._id_cache[cache_key]
 
-        last_error: Optional[EvaAPIError] = None
+        last_error: EvaAPIError | None = None
         for entity_name in entities:
             try:
                 found = self.call(f"{entity_name}.get", code=code, fields=["id", "code"])
@@ -240,28 +244,25 @@ class EvaClient:
     def get_task(
         self,
         code: str,
-        fields: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        fields: list[str] | None = None,
+    ) -> dict[str, Any]:
         """Get task by code."""
-        params: Dict[str, Any] = {"code": code}
+        params: dict[str, Any] = {"code": code}
         if fields:
             params["fields"] = fields
         return self.call("CmfTask.get", **params)
-    
+
     def list_tasks(
         self,
-        filters: Optional[List[List[Any]]] = None,
+        filters: list[list[Any]] | None = None,
         limit: int = 50,
         offset: int = 0,
-        fields: Optional[List[str]] = None,
-        order_by: Optional[List[str]] = None,
+        fields: list[str] | None = None,
+        order_by: list[str] | None = None,
         include_archived: bool = False,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List tasks with optional filters."""
-        params = {
-            "slice": [offset, offset + limit],
-            "include_archived": include_archived
-        }
+        params = {"slice": [offset, offset + limit], "include_archived": include_archived}
         if filters:
             params["filter"] = filters
         if fields:
@@ -269,8 +270,8 @@ class EvaClient:
         if order_by:
             params["order_by"] = order_by
         return self.call("CmfTask.list", **params)
-    
-    def count_tasks(self, filters: Optional[List[List[Any]]] = None) -> int:
+
+    def count_tasks(self, filters: list[list[Any]] | None = None) -> int:
         """Count tasks with optional filters."""
         params = {}
         if filters:
@@ -282,9 +283,9 @@ class EvaClient:
         list_code: str,
         limit: int = 100,
         offset: int = 0,
-        fields: Optional[List[str]] = None,
+        fields: list[str] | None = None,
         include_archived: bool = False,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         List tasks in a sprint/list.
 
@@ -292,7 +293,7 @@ class EvaClient:
         """
         list_id = self.resolve_id(list_code, "CmfList")
 
-        params: Dict[str, Any] = {
+        params: dict[str, Any] = {
             "filter": [["lists", "IN", [list_id]]],
             "slice": [offset, offset + limit],
             "include_archived": include_archived,
@@ -300,19 +301,19 @@ class EvaClient:
         if fields:
             params["fields"] = fields
         return self.call("CmfTask.list", **params)
-    
+
     def create_task(
         self,
         name: str,
-        parent: Optional[str] = None,
-        lists: Optional[List[str]] = None,
-        text: Optional[str] = None,
-        responsible: Optional[str] = None,
-        **kwargs
-    ) -> Dict[str, Any]:
+        parent: str | None = None,
+        lists: list[str] | None = None,
+        text: str | None = None,
+        responsible: str | None = None,
+        **kwargs,
+    ) -> dict[str, Any]:
         """Create a new task."""
         params = {"name": name}
-        
+
         if parent:
             params["parent"] = parent
         if lists:
@@ -323,8 +324,8 @@ class EvaClient:
             params["responsible"] = responsible
         params.update(kwargs)
         return self.call("CmfTask.create", **params)
-    
-    def update_task(self, code: str, **kwargs) -> Dict[str, Any]:
+
+    def update_task(self, code: str, **kwargs) -> dict[str, Any]:
         """
         Update an existing task.
 
@@ -334,19 +335,19 @@ class EvaClient:
         """
         task_id = self.resolve_id(code, "CmfTask")
         return self.call("CmfTask.update", task_id, **kwargs)
-    
+
     # Project operations
-    def get_project(self, code: str) -> Dict[str, Any]:
+    def get_project(self, code: str) -> dict[str, Any]:
         """Get project by code."""
         return self.call("CmfProject.get", code=code)
-    
+
     def list_projects(
         self,
-        filters: Optional[List[List[Any]]] = None,
+        filters: list[list[Any]] | None = None,
         limit: int = 50,
         offset: int = 0,
-        fields: Optional[List[str]] = None,
-    ) -> List[Dict[str, Any]]:
+        fields: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
         """List projects with optional filters."""
         params = {"slice": [offset, offset + limit]}
         if filters:
@@ -354,26 +355,26 @@ class EvaClient:
         if fields:
             params["fields"] = fields
         return self.call("CmfProject.list", **params)
-    
-    def count_projects(self, filters: Optional[List[List[Any]]] = None) -> int:
+
+    def count_projects(self, filters: list[list[Any]] | None = None) -> int:
         """Count projects with optional filters."""
         params = {}
         if filters:
             params["filter"] = filters
         return self.call("CmfProject.count", **params)
-    
+
     # User operations
-    def get_user(self, code: str) -> Dict[str, Any]:
+    def get_user(self, code: str) -> dict[str, Any]:
         """Get user by code."""
         return self.call("CmfPerson.get", code=code)
-    
+
     def list_users(
         self,
-        filters: Optional[List[List[Any]]] = None,
+        filters: list[list[Any]] | None = None,
         limit: int = 50,
         offset: int = 0,
-        fields: Optional[List[str]] = None,
-    ) -> List[Dict[str, Any]]:
+        fields: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
         """List users with optional filters."""
         params = {"slice": [offset, offset + limit]}
         if filters:
@@ -381,19 +382,19 @@ class EvaClient:
         if fields:
             params["fields"] = fields
         return self.call("CmfPerson.list", **params)
-    
+
     # Document operations
-    def get_document(self, code: str) -> Dict[str, Any]:
+    def get_document(self, code: str) -> dict[str, Any]:
         """Get document by code."""
         return self.call("CmfDocument.get", code=code)
-    
+
     def list_documents(
         self,
-        filters: Optional[List[List[Any]]] = None,
+        filters: list[list[Any]] | None = None,
         limit: int = 50,
         offset: int = 0,
-        fields: Optional[List[str]] = None,
-    ) -> List[Dict[str, Any]]:
+        fields: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
         """List documents with optional filters."""
         params = {"slice": [offset, offset + limit]}
         if filters:
@@ -401,15 +402,15 @@ class EvaClient:
         if fields:
             params["fields"] = fields
         return self.call("CmfDocument.list", **params)
-    
+
     # Comment operations
     def list_comments(
         self,
-        filters: Optional[List[List[Any]]] = None,
+        filters: list[list[Any]] | None = None,
         limit: int = 50,
         offset: int = 0,
-        fields: Optional[List[str]] = None,
-    ) -> List[Dict[str, Any]]:
+        fields: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
         """List comments with optional filters."""
         params = {"slice": [offset, offset + limit]}
         if filters:
@@ -417,13 +418,8 @@ class EvaClient:
         if fields:
             params["fields"] = fields
         return self.call("CmfComment.list", **params)
-    
-    def create_comment(
-        self,
-        parent: str,
-        text: str,
-        **kwargs
-    ) -> Dict[str, Any]:
+
+    def create_comment(self, parent: str, text: str, **kwargs) -> dict[str, Any]:
         """Create a new comment."""
         params = {
             "parent": parent,
@@ -431,13 +427,13 @@ class EvaClient:
         }
         params.update(kwargs)
         return self.call("CmfComment.create", **params)
-    
+
     # List/Sprint operations
-    def get_list(self, code: str) -> Dict[str, Any]:
+    def get_list(self, code: str) -> dict[str, Any]:
         """Get list/sprint by code."""
         return self.call("CmfList.get", code=code)
-    
-    def create_list(self, name: str, parent: str, **kwargs) -> Dict[str, Any]:
+
+    def create_list(self, name: str, parent: str, **kwargs) -> dict[str, Any]:
         """Create a new list/sprint under a project.
 
         NOTE: This is a write operation and will be blocked when read_only=True.
@@ -445,14 +441,14 @@ class EvaClient:
         params = {"name": name, "parent": parent}
         params.update(kwargs)
         return self.call("CmfList.create", **params)
-    
+
     def list_lists(
         self,
-        filters: Optional[List[List[Any]]] = None,
+        filters: list[list[Any]] | None = None,
         limit: int = 50,
         offset: int = 0,
-        fields: Optional[List[str]] = None,
-    ) -> List[Dict[str, Any]]:
+        fields: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
         """List all lists/sprints with optional filters."""
         params = {"slice": [offset, offset + limit]}
         if filters:
@@ -460,15 +456,15 @@ class EvaClient:
         if fields:
             params["fields"] = fields
         return self.call("CmfList.list", **params)
-    
+
     # Audit operations
     def list_audit(
         self,
-        filters: Optional[List[List[Any]]] = None,
+        filters: list[list[Any]] | None = None,
         limit: int = 50,
         offset: int = 0,
-        fields: Optional[List[str]] = None,
-    ) -> List[Dict[str, Any]]:
+        fields: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
         """List audit log entries with optional filters."""
         params = {"slice": [offset, offset + limit]}
         if filters:
@@ -476,16 +472,15 @@ class EvaClient:
         if fields:
             params["fields"] = fields
         return self.call("CmfAudit.list", **params)
-    
+
     def close(self):
         """Close the HTTP client."""
         self.client.close()
-    
+
     def __enter__(self):
         """Context manager entry."""
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit."""
         self.close()
-
