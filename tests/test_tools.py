@@ -146,6 +146,37 @@ def test_get_comments_success(eva_tools, mock_client):
     assert result_data["count"] == 1
 
 
+def test_get_tasks_by_list_success(eva_tools, mock_client):
+    """Test listing tasks in a sprint/list."""
+    mock_client.get_list.return_value = {
+        "id": "CmfList:aa404b17-3d52-11f1-923c-0a580aee2812",
+        "code": "LST-002269",
+        "cache_members_count": 2,
+    }
+    mock_client.list_tasks_by_list.return_value = [
+        {"code": "FT-1", "name": "Task 1", "text": "<p>Desc 1</p>"},
+        {"code": "FT-2", "name": "Task 2", "text": None},
+    ]
+
+    result = eva_tools.get_tasks_by_list(list_code="LST-002269")
+    result_data = json.loads(result)
+
+    assert result_data["success"] is True
+    assert result_data["count"] == 2
+    assert result_data["tasks"][0]["text"] == "<p>Desc 1</p>"
+    mock_client.list_tasks_by_list.assert_called_once()
+
+
+def test_get_tasks_by_list_empty_code(eva_tools, mock_client):
+    """Test get_tasks_by_list with missing list_code."""
+    result = eva_tools.get_tasks_by_list(list_code="")
+    result_data = json.loads(result)
+
+    assert result_data["success"] is False
+    assert "required" in result_data["error"].lower()
+    mock_client.get_list.assert_not_called()
+
+
 def test_list_sprints_success(eva_tools, mock_client):
     """Test listing sprints."""
     mock_client.list_lists.return_value = [

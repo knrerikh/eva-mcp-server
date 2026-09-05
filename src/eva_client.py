@@ -156,9 +156,16 @@ class EvaClient:
             raise EvaAPIError(f"Unexpected error: {str(e)}")
     
     # Task operations
-    def get_task(self, code: str) -> Dict[str, Any]:
+    def get_task(
+        self,
+        code: str,
+        fields: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
         """Get task by code."""
-        return self.call("CmfTask.get", code=code)
+        params: Dict[str, Any] = {"code": code}
+        if fields:
+            params["fields"] = fields
+        return self.call("CmfTask.get", **params)
     
     def list_tasks(
         self,
@@ -188,6 +195,33 @@ class EvaClient:
         if filters:
             params["filter"] = filters
         return self.call("CmfTask.count", **params)
+
+    def list_tasks_by_list(
+        self,
+        list_code: str,
+        limit: int = 100,
+        offset: int = 0,
+        fields: Optional[List[str]] = None,
+        include_archived: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """
+        List tasks in a sprint/list.
+
+        Filter must use list entity id (CmfList:uuid), not human-readable code.
+        """
+        list_meta = self.get_list(list_code)
+        list_id = list_meta.get("id")
+        if not list_id:
+            raise EvaAPIError(f"List '{list_code}' has no id in Eva response")
+
+        params: Dict[str, Any] = {
+            "filter": [["lists", "IN", [list_id]]],
+            "slice": [offset, offset + limit],
+            "include_archived": include_archived,
+        }
+        if fields:
+            params["fields"] = fields
+        return self.call("CmfTask.list", **params)
     
     def create_task(
         self,

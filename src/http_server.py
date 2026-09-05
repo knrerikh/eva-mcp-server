@@ -338,6 +338,16 @@ async def get_sprint(request: SprintCodeRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/tools/eva_get_tasks_by_list")
+async def get_tasks_by_list(request: SprintCodeRequest):
+    """Get tasks in a sprint/list."""
+    try:
+        result = eva_tools.get_tasks_by_list(list_code=request.list_code)
+        return {"success": True, "result": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/tools/eva_create_list")
 async def create_list(request: CreateListRequest):
     """Create new sprint."""

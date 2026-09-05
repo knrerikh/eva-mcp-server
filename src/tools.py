@@ -8,6 +8,25 @@ from eva_client import EvaClient, EvaAPIError
 
 logger = logging.getLogger(__name__)
 
+TASK_DETAIL_FIELDS = [
+    "code",
+    "name",
+    "text",
+    "parent_id",
+    "project_id",
+    "cache_status_type",
+    "cache_child_tasks_count",
+    "workflow_id",
+    "epic",
+    "epic_id",
+    "deadline",
+    "priority",
+    "responsible",
+    "responsible_id",
+    "lists",
+    "cmf_owner_id",
+]
+
 
 class EvaTools:
     """MCP tools for interacting with Eva API."""
@@ -86,7 +105,7 @@ class EvaTools:
             JSON string with task details
         """
         try:
-            task = self.client.get_task(task_code)
+            task = self.client.get_task(task_code, fields=TASK_DETAIL_FIELDS)
             
             return json.dumps({
                 "success": True,
@@ -99,6 +118,78 @@ class EvaTools:
                 "error": e.message,
                 "code": e.code
             }, ensure_ascii=False, indent=2)
+
+    def get_tasks_by_list(
+        self,
+        list_code: str,
+        limit: Optional[int] = None,
+        offset: int = 0,
+        include_archived: bool = False,
+    ) -> str:
+        """
+        Get tasks in a sprint/list (e.g. LST-002269).
+
+        Uses ``lists IN [CmfList:uuid]`` and returns task ``text`` (HTML description).
+        """
+        try:
+            if not list_code or not str(list_code).strip():
+                raise ValueError("list_code is required")
+
+            list_code = str(list_code).strip()
+            list_meta = self.client.get_list(list_code)
+
+            expected = list_meta.get("cache_members_count")
+            target = limit if limit is not None else (int(expected) + 5 if expected else 50)
+            page_size = min(50, max(target, 1))
+
+            tasks: List[Dict[str, Any]] = []
+            current_offset = offset
+
+            while len(tasks) < target:
+                batch = self.client.list_tasks_by_list(
+                    list_code=list_code,
+                    limit=page_size,
+                    offset=current_offset,
+                    fields=TASK_DETAIL_FIELDS,
+                    include_archived=include_archived,
+                )
+                if not batch:
+                    break
+                tasks.extend(batch)
+                if len(batch) < page_size:
+                    break
+                current_offset += page_size
+                if limit is not None:
+                    break
+
+            if limit is not None:
+                tasks = tasks[:limit]
+
+            return json.dumps(
+                {
+                    "success": True,
+                    "list_code": list_code,
+                    "list_id": list_meta.get("id"),
+                    "list": list_meta,
+                    "count": len(tasks),
+                    "tasks": tasks,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+
+        except EvaAPIError as e:
+            return json.dumps(
+                {"success": False, "error": e.message, "code": e.code},
+                ensure_ascii=False,
+                indent=2,
+            )
+        except ValueError as e:
+            return json.dumps(
+                {"success": False, "error": str(e)},
+                ensure_ascii=False,
+                indent=2,
+            )
     
     def count_tasks_by_filter(
         self,
