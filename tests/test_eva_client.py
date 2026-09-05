@@ -1,14 +1,14 @@
 """Tests for Eva API client."""
 
-import pytest
-from unittest.mock import Mock, patch
-import httpx
-
-import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+import sys
+from unittest.mock import Mock, patch
 
-from eva_client import EvaClient, EvaAPIError
+import pytest
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+
+from eva_client import EvaAPIError, EvaClient
 
 
 @pytest.fixture
@@ -21,9 +21,7 @@ def real_client():
     """
     with patch.dict(os.environ, {"EVA_API_TOKEN": "test_token"}):
         client = EvaClient(
-            api_url="https://test.eva.com/api",
-            api_token="test_token",
-            read_only=True
+            api_url="https://test.eva.com/api", api_token="test_token", read_only=True
         )
         yield client
         client.close()
@@ -33,23 +31,23 @@ def test_client_initialization():
     """Test client initialization."""
     with patch.dict(os.environ, {"EVA_API_TOKEN": "test_token"}):
         client = EvaClient(
-            api_url="https://test.eva.com/api",
-            api_token="test_token",
-            read_only=True
+            api_url="https://test.eva.com/api", api_token="test_token", read_only=True
         )
-        
+
         assert client.api_url == "https://test.eva.com/api"
         assert client.api_token == "test_token"
         assert client.read_only is True
-        
+
         client.close()
 
 
 def test_client_initialization_without_token():
     """Test that client initialization fails without token."""
-    with patch.dict(os.environ, {}, clear=True):
-        with pytest.raises(ValueError, match="API token is required"):
-            EvaClient(api_url="https://test.eva.com/api")
+    with (
+        patch.dict(os.environ, {}, clear=True),
+        pytest.raises(ValueError, match="API token is required"),
+    ):
+        EvaClient(api_url="https://test.eva.com/api")
 
 
 def test_read_only_protection(real_client):
@@ -74,7 +72,7 @@ def test_generate_callid(real_client):
 def test_build_request(real_client):
     """Test request building."""
     request = real_client._build_request("CmfTask.get", {"code": "TASK-123"})
-    
+
     assert request["jsonrpc"] == "2.2"
     assert request["method"] == "CmfTask.get"
     assert "callid" in request
@@ -85,14 +83,12 @@ def test_build_request(real_client):
 async def test_successful_api_call(real_client):
     """Test successful API call."""
     mock_response = Mock()
-    mock_response.json.return_value = {
-        "result": {"code": "TASK-123", "name": "Test Task"}
-    }
+    mock_response.json.return_value = {"result": {"code": "TASK-123", "name": "Test Task"}}
     mock_response.raise_for_status = Mock()
-    
-    with patch.object(real_client.client, 'post', return_value=mock_response):
+
+    with patch.object(real_client.client, "post", return_value=mock_response):
         result = real_client.call("CmfTask.get", code="TASK-123")
-        
+
         assert result == {"code": "TASK-123", "name": "Test Task"}
 
 
@@ -100,17 +96,14 @@ async def test_successful_api_call(real_client):
 async def test_api_error_response(real_client):
     """Test API error response handling."""
     mock_response = Mock()
-    mock_response.json.return_value = {
-        "error": {
-            "code": -32600,
-            "message": "Invalid Request"
-        }
-    }
+    mock_response.json.return_value = {"error": {"code": -32600, "message": "Invalid Request"}}
     mock_response.raise_for_status = Mock()
-    
-    with patch.object(real_client.client, 'post', return_value=mock_response):
-        with pytest.raises(EvaAPIError, match="Invalid Request"):
-            real_client.call("CmfTask.get", code="TASK-123")
+
+    with (
+        patch.object(real_client.client, "post", return_value=mock_response),
+        pytest.raises(EvaAPIError, match="Invalid Request"),
+    ):
+        real_client.call("CmfTask.get", code="TASK-123")
 
 
 def test_build_request_with_positional_args(real_client):
@@ -149,9 +142,7 @@ async def test_call_sends_positional_args(real_client):
 def test_resolve_id_passes_entity_ids_through(real_client):
     """An internal identifier needs no lookup."""
     with patch.object(real_client, "call") as call:
-        resolved = real_client.resolve_id(
-            "CmfTask:11111111-2222-3333-4444-555555555555", "CmfTask"
-        )
+        resolved = real_client.resolve_id("CmfTask:11111111-2222-3333-4444-555555555555", "CmfTask")
 
     assert resolved == "CmfTask:11111111-2222-3333-4444-555555555555"
     call.assert_not_called()
@@ -170,9 +161,7 @@ def test_resolve_id_looks_up_human_code(real_client):
 
 def test_resolve_id_caches_lookups(real_client):
     """The same code is looked up once, not on every call."""
-    with patch.object(
-        real_client, "call", return_value={"id": "CmfTask:abc"}
-    ) as call:
+    with patch.object(real_client, "call", return_value={"id": "CmfTask:abc"}) as call:
         real_client.resolve_id("ABC-1", "CmfTask")
         real_client.resolve_id("ABC-1", "CmfTask")
 
@@ -181,6 +170,7 @@ def test_resolve_id_caches_lookups(real_client):
 
 def test_resolve_id_tries_several_entities(real_client):
     """A comment parent may be a task or a document."""
+
     def fake_call(method, *args, **kwargs):
         if method == "CmfTask.get":
             raise EvaAPIError("not found", code=500)
@@ -194,9 +184,11 @@ def test_resolve_id_tries_several_entities(real_client):
 
 def test_resolve_id_reports_unresolvable_code(real_client):
     """An unresolvable code fails loudly instead of returning a silent zero."""
-    with patch.object(real_client, "call", return_value={}):
-        with pytest.raises(EvaAPIError, match="NOPE-1"):
-            real_client.resolve_id("NOPE-1", "CmfTask")
+    with (
+        patch.object(real_client, "call", return_value={}),
+        pytest.raises(EvaAPIError, match="NOPE-1"),
+    ):
+        real_client.resolve_id("NOPE-1", "CmfTask")
 
 
 @pytest.mark.asyncio
@@ -204,16 +196,19 @@ async def test_update_task_sends_resolved_id_positionally(real_client):
     """Defect 1: CmfTask.update takes the entity id in args[0]."""
     real_client.read_only = False
 
-    with patch.object(real_client, "resolve_id", return_value="CmfTask:abc"):
-        with patch.object(real_client, "call", return_value="CmfTask:abc") as call:
-            real_client.update_task("ABC-1", name="New name")
+    with (
+        patch.object(real_client, "resolve_id", return_value="CmfTask:abc"),
+        patch.object(real_client, "call", return_value="CmfTask:abc") as call,
+    ):
+        real_client.update_task("ABC-1", name="New name")
 
     call.assert_called_once_with("CmfTask.update", "CmfTask:abc", name="New name")
 
 
 def test_context_manager(real_client):
     """Test client as context manager."""
-    with patch.dict(os.environ, {"EVA_API_TOKEN": "test_token"}):
-        with EvaClient(api_url="https://test.eva.com/api", api_token="test_token") as client:
-            assert client.api_url == "https://test.eva.com/api"
-
+    with (
+        patch.dict(os.environ, {"EVA_API_TOKEN": "test_token"}),
+        EvaClient(api_url="https://test.eva.com/api", api_token="test_token") as client,
+    ):
+        assert client.api_url == "https://test.eva.com/api"

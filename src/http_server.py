@@ -2,15 +2,11 @@
 
 import os
 import sys
-import json
-import asyncio
-from typing import Any, Dict, List
 from pathlib import Path
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-import httpx
-from dotenv import load_dotenv
 
 # Load environment variables from .env file
 env_path = Path(__file__).parent.parent / ".env"
@@ -21,9 +17,6 @@ src_dir = Path(__file__).parent
 if str(src_dir) not in sys.path:
     sys.path.insert(0, str(src_dir))
 
-from mcp.server import Server
-from mcp.server.stdio import stdio_server
-from mcp.types import Tool, TextContent
 
 from eva_client import EvaClient
 from tools import EvaTools
@@ -38,29 +31,27 @@ eva_tools: EvaTools = None
 def initialize_client():
     """Initialize Eva API client and tools."""
     global eva_client, eva_tools
-    
+
     try:
         api_url = os.getenv("EVA_API_URL", "https://eva-api.example.com")
         api_token = os.getenv("EVA_API_TOKEN")
         read_only = os.getenv("EVA_READ_ONLY", "false").lower() == "true"
-        
-        print(f"Initializing Eva MCP HTTP Server...")
+
+        print("Initializing Eva MCP HTTP Server...")
         print(f"API URL: {api_url}")
-        print(f"API Token from env: {api_token[:4] if api_token else 'MISSING'}...{api_token[-4:] if api_token and len(api_token) > 8 else ''}")
+        print(
+            f"API Token from env: {api_token[:4] if api_token else 'MISSING'}...{api_token[-4:] if api_token and len(api_token) > 8 else ''}"
+        )
         print(f"Read-only mode: {read_only}")
-        
+
         if not api_token:
             raise ValueError("EVA_API_TOKEN environment variable is required")
-        
-        eva_client = EvaClient(
-            api_url=api_url,
-            api_token=api_token,
-            read_only=read_only
-        )
+
+        eva_client = EvaClient(api_url=api_url, api_token=api_token, read_only=read_only)
         eva_tools = EvaTools(eva_client)
-        
+
         print("[OK] Eva MCP HTTP Server ready")
-        
+
     except Exception as e:
         print(f"Failed to initialize: {e}")
         sys.exit(1)
@@ -88,7 +79,7 @@ class CountTasksRequest(BaseModel):
 class CreateTaskRequest(BaseModel):
     name: str
     project_code: str = ""
-    lists: List[str] = []
+    lists: list[str] = []
     description: str = ""
     responsible: str = ""
     priority: int = 0
@@ -163,7 +154,7 @@ async def search_tasks(request: SearchTasksRequest):
             project=request.project,
             responsible=request.responsible,
             status=request.status,
-            limit=request.limit
+            limit=request.limit,
         )
         return {"success": True, "result": result}
     except Exception as e:
@@ -185,9 +176,7 @@ async def count_tasks(request: CountTasksRequest):
     """Count tasks by filter."""
     try:
         result = eva_tools.count_tasks_by_filter(
-            project=request.project,
-            responsible=request.responsible,
-            status=request.status
+            project=request.project, responsible=request.responsible, status=request.status
         )
         return {"success": True, "result": result}
     except Exception as e:
@@ -204,7 +193,7 @@ async def create_task(request: CreateTaskRequest):
             lists=request.lists,
             description=request.description,
             responsible=request.responsible,
-            priority=request.priority
+            priority=request.priority,
         )
         return {"success": True, "result": result}
     except Exception as e:
@@ -221,7 +210,7 @@ async def update_task(request: UpdateTaskRequest):
             description=request.description,
             responsible=request.responsible,
             status=request.status,
-            priority=request.priority
+            priority=request.priority,
         )
         return {"success": True, "result": result}
     except Exception as e:
@@ -273,9 +262,7 @@ async def search_documents(request: SearchDocumentsRequest):
     """Search documents."""
     try:
         result = eva_tools.search_documents(
-            query=request.query,
-            project=request.project,
-            limit=request.limit
+            query=request.query, project=request.project, limit=request.limit
         )
         return {"success": True, "result": result}
     except Exception as e:
@@ -296,10 +283,7 @@ async def get_document(request: DocumentCodeRequest):
 async def get_comments(request: ParentCodeRequest):
     """Get comments."""
     try:
-        result = eva_tools.get_comments(
-            parent_code=request.parent_code,
-            limit=request.limit
-        )
+        result = eva_tools.get_comments(parent_code=request.parent_code, limit=request.limit)
         return {"success": True, "result": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -309,10 +293,7 @@ async def get_comments(request: ParentCodeRequest):
 async def add_comment(request: AddCommentRequest):
     """Add comment."""
     try:
-        result = eva_tools.add_comment(
-            parent_code=request.parent_code,
-            text=request.text
-        )
+        result = eva_tools.add_comment(parent_code=request.parent_code, text=request.text)
         return {"success": True, "result": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -352,10 +333,7 @@ async def get_tasks_by_list(request: SprintCodeRequest):
 async def create_list(request: CreateListRequest):
     """Create new sprint."""
     try:
-        result = eva_tools.create_list(
-            name=request.name,
-            project_code=request.project_code
-        )
+        result = eva_tools.create_list(name=request.name, project_code=request.project_code)
         return {"success": True, "result": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -365,10 +343,7 @@ async def create_list(request: CreateListRequest):
 async def get_audit_log(request: AuditLogRequest):
     """Get audit log."""
     try:
-        result = eva_tools.get_audit_log(
-            entity_code=request.entity_code,
-            limit=request.limit
-        )
+        result = eva_tools.get_audit_log(entity_code=request.entity_code, limit=request.limit)
         return {"success": True, "result": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -388,6 +363,7 @@ async def startup_event():
 
 if __name__ == "__main__":
     import uvicorn
+
     port = int(os.getenv("EVA_MCP_HTTP_PORT", "8081"))
     print(f"Starting Eva MCP HTTP Server on port {port}")
     uvicorn.run(app, host="0.0.0.0", port=port)

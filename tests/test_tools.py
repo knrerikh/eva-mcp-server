@@ -10,7 +10,6 @@ thing under test.
 import json
 
 import pytest
-
 from fixtures import (
     AUDIT_ROW_DENIED,
     CMF_STATUS,
@@ -31,6 +30,7 @@ from fixtures import (
     TASK_ID,
     filters_of,
 )
+
 from eva_client import EvaAPIError
 from tools import TASK_DETAIL_FIELDS
 

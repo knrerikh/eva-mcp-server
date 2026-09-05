@@ -16,9 +16,10 @@ TESTS_DIR = os.path.dirname(__file__)
 sys.path.insert(0, os.path.join(TESTS_DIR, "..", "src"))
 sys.path.insert(0, TESTS_DIR)
 
-from eva_client import EvaAPIError, EvaClient  # noqa: E402
-from fixtures import RESOLVED  # noqa: E402
-from tools import EvaTools  # noqa: E402
+from fixtures import RESOLVED
+
+from eva_client import EvaAPIError, EvaClient
+from tools import EvaTools
 
 
 @pytest.fixture

@@ -61,6 +61,13 @@ target-version = ['py310']
 line-length = 100
 target-version = "py310"
 
+[tool.ruff.lint]
+# BLE001 (blind except) is deliberate here. This is an API boundary: the client
+# wraps anything the transport or the server throws into EvaAPIError, and every
+# tool turns that into a JSON error for the MCP caller. Narrowing these would
+# let an unforeseen exception escape as a crash instead of a readable result.
+ignore = ["BLE001"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
