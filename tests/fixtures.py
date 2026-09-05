@@ -99,15 +99,32 @@ TASK_DETAILED = {
     "priority": 3,
 }
 
-#: A comment row. ``code`` really is null on comments — they are addressed by id,
-#: and ``parent_id`` points at the entity they hang off.
+#: A comment row as it arrives when the body fields are asked for. ``code`` and
+#: ``name`` really are null on comments — they are addressed by id — and the
+#: default response carries neither ``text`` nor ``cmf_created_at``, so a caller
+#: that omits ``fields`` can count comments but not read them. The author is a
+#: nested person under ``cmf_owner``; there is no ``author`` or ``created_by``
+#: field, and no ``cmf_updated_at``.
 COMMENT_ROW = {
     "id": COMMENT_ID,
     "class_name": "CmfComment",
     "code": None,
+    "name": None,
+    "private": False,
     "cmf_created_at": "2026-09-05T01:42:00.547012+03:00",
+    "cmf_owner": CMF_PERSON,
+    "cmf_owner_id": PERSON_ID,
     "parent_id": TASK_ID,
+    "project_id": PROJECT_ID,
     "text": "<p>Test comment</p>",
+}
+
+#: A second comment, written later. Used to pin the order the thread reads in.
+COMMENT_ROW_NEWER = {
+    **COMMENT_ROW,
+    "id": "CmfComment:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+    "cmf_created_at": "2026-09-05T09:30:24.001656+03:00",
+    "text": "<p>Later comment</p>",
 }
 
 #: An audit row the current token may not read. The entry is found, but every

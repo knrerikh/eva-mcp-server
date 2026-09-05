@@ -41,6 +41,25 @@ TASK_DETAIL_FIELDS = [
     "cmf_owner_id",
 ]
 
+# The default CmfComment response carries id, parent, owner id and two nulls —
+# no body and no date. Comments could be counted but not read until these were
+# asked for. Verified against a live instance: `text`, `cmf_created_at` and
+# `cmf_owner` (which expands to the full person) exist; `author`, `created_by`
+# and `cmf_updated_at` do not — Eva ignores unknown field names silently rather
+# than reporting them, so this list is empirical, not guessed.
+COMMENT_FIELDS = [
+    "text",
+    "cmf_created_at",
+    "cmf_owner",
+    "parent_id",
+    "private",
+]
+
+# Newest first on the wire, so that a `limit` keeps the most recent comments
+# rather than the oldest; the page is reversed before returning so the thread
+# still reads in the order it was written.
+COMMENT_ORDER = ["-cmf_created_at"]
+
 
 def looks_double_escaped(text: str | None) -> bool:
     """
@@ -589,7 +608,16 @@ class EvaTools:
         try:
             parent_id = self.client.resolve_id(parent_code, ("CmfTask", "CmfDocument"))
 
-            comments = self.client.list_comments(filters=[["parent", "=", parent_id]], limit=limit)
+            comments = self.client.list_comments(
+                filters=[["parent", "=", parent_id]],
+                limit=limit,
+                fields=COMMENT_FIELDS,
+                order_by=COMMENT_ORDER,
+            )
+
+            # Asked for newest first so a limit keeps recent comments; reversed
+            # here so the thread reads in the order it was written.
+            comments = list(reversed(comments))
 
             return json.dumps(
                 {
@@ -629,11 +657,23 @@ class EvaTools:
             parent_id = self.client.resolve_id(parent_code, ("CmfTask", "CmfDocument"))
             text, repaired = repair_html(text)
 
-            comment = self.client.create_comment(parent=parent_id, text=text)
+            created = self.client.create_comment(parent=parent_id, text=text)
+
+            # create returns the new entity id and nothing else, so the caller
+            # cannot see what was actually stored. Read it back: this is the
+            # round trip that showed HTML arriving escaped.
+            comment_id = created.get("id") if isinstance(created, dict) else created
+            comment = created
+            if comment_id:
+                try:
+                    comment = self.client.get_comment(comment_id, fields=COMMENT_FIELDS)
+                except EvaAPIError:
+                    logger.warning("Comment %s created but could not be read back", comment_id)
 
             payload = {
                 "success": True,
                 "parent_id": parent_id,
+                "comment_id": comment_id,
                 "comment": comment,
                 "message": "Comment added successfully",
             }

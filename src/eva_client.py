@@ -410,6 +410,7 @@ class EvaClient:
         limit: int = 50,
         offset: int = 0,
         fields: list[str] | None = None,
+        order_by: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         """List comments with optional filters."""
         params = {"slice": [offset, offset + limit]}
@@ -417,7 +418,24 @@ class EvaClient:
             params["filter"] = filters
         if fields:
             params["fields"] = fields
+        if order_by:
+            params["order_by"] = order_by
         return self.call("CmfComment.list", **params)
+
+    def get_comment(
+        self,
+        comment_id: str,
+        fields: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Get a single comment by entity id.
+
+        Comments carry no code — ``code`` and ``name`` are always null — so they
+        are addressed by id, which is what ``CmfComment.create`` hands back.
+        """
+        params: dict[str, Any] = {"id": comment_id}
+        if fields:
+            params["fields"] = fields
+        return self.call("CmfComment.get", **params)
 
     def create_comment(self, parent: str, text: str, **kwargs) -> dict[str, Any]:
         """Create a new comment."""
