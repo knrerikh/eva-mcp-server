@@ -64,3 +64,6 @@ test_api_manual.py
 
 # Project specific rules
 EVA_TASK_RULES.md
+# Local helper scripts (may reference private infrastructure)
+scripts/
+uv.lock

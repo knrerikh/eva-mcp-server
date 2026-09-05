@@ -81,14 +81,14 @@ async def list_tools() -> list[Tool]:
         # Task tools
         Tool(
             name="eva_search_tasks",
-            description="Search and list tasks with optional filters (query, project, responsible, status)",
+            description="Search and list tasks with optional filters. Text query matches both title and description; project/responsible codes are resolved to entity ids automatically.",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "query": {"type": "string", "description": "Search query text"},
-                    "project": {"type": "string", "description": "Filter by project code"},
-                    "responsible": {"type": "string", "description": "Filter by responsible user"},
-                    "status": {"type": "string", "description": "Filter by task status"},
+                    "query": {"type": "string", "description": "Search text, matched against task title and description"},
+                    "project": {"type": "string", "description": "Filter by project code or entity id"},
+                    "responsible": {"type": "string", "description": "Filter by responsible login/email or entity id"},
+                    "status": {"type": "string", "description": "Status name (e.g. 'Backlog') or status type (e.g. 'OPEN')"},
                     "limit": {"type": "integer", "description": "Maximum number of results", "default": 20},
                 },
             },
@@ -110,9 +110,9 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "project": {"type": "string", "description": "Filter by project code"},
-                    "responsible": {"type": "string", "description": "Filter by responsible user"},
-                    "status": {"type": "string", "description": "Filter by task status"},
+                    "project": {"type": "string", "description": "Filter by project code or entity id"},
+                    "responsible": {"type": "string", "description": "Filter by responsible login/email or entity id"},
+                    "status": {"type": "string", "description": "Status name (e.g. 'Backlog') or status type (e.g. 'OPEN')"},
                 },
             },
         ),
@@ -129,7 +129,7 @@ async def list_tools() -> list[Tool]:
                         "items": {"type": "string"},
                         "description": "List of sprint/list codes to add task to (e.g., ['SPR-000929']). Use with project_code for proper linking."
                     },
-                    "description": {"type": "string", "description": "Task description (HTML)"},
+                    "description": {"type": "string", "description": "Task description. Raw HTML, e.g. \"<p>Text</p>\". Pre-escaped markup (\"&lt;p&gt;\") is stored verbatim and shown to the reader as tags."},
                     "responsible": {"type": "string", "description": "Responsible user email/login"},
                     "priority": {"type": "integer", "description": "Task priority (0-5)"},
                 },
@@ -142,9 +142,9 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "task_code": {"type": "string", "description": "Task code to update"},
+                    "task_code": {"type": "string", "description": "Task code to update (or entity id)"},
                     "name": {"type": "string", "description": "New task name"},
-                    "description": {"type": "string", "description": "New task description (HTML)"},
+                    "description": {"type": "string", "description": "New task description. Raw HTML, e.g. \"<p>Text</p>\". Pre-escaped markup (\"&lt;p&gt;\") is stored verbatim and shown to the reader as tags."},
                     "responsible": {"type": "string", "description": "New responsible user"},
                     "status": {"type": "string", "description": "New task status"},
                     "priority": {"type": "integer", "description": "New task priority (0-5)"},
@@ -206,8 +206,8 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "query": {"type": "string", "description": "Search query text"},
-                    "project": {"type": "string", "description": "Filter by project code"},
+                    "query": {"type": "string", "description": "Search text, matched against document title and body"},
+                    "project": {"type": "string", "description": "Filter by project code or entity id"},
                     "limit": {"type": "integer", "description": "Maximum number of results", "default": 20},
                 },
             },
@@ -231,7 +231,7 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "parent_code": {"type": "string", "description": "Parent task or document code"},
+                    "parent_code": {"type": "string", "description": "Parent task or document code (or entity id)"},
                     "limit": {"type": "integer", "description": "Maximum number of results", "default": 50},
                 },
                 "required": ["parent_code"],
@@ -243,8 +243,8 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "parent_code": {"type": "string", "description": "Parent task or document code"},
-                    "text": {"type": "string", "description": "Comment text (HTML)"},
+                    "parent_code": {"type": "string", "description": "Parent task or document code (or entity id)"},
+                    "text": {"type": "string", "description": "Comment text. Raw HTML, e.g. \"<p>Text</p>\". Pre-escaped markup (\"&lt;p&gt;\") is stored verbatim and shown to the reader as tags."},
                 },
                 "required": ["parent_code", "text"],
             },
@@ -273,6 +273,34 @@ async def list_tools() -> list[Tool]:
             },
         ),
         Tool(
+            name="eva_get_tasks_by_list",
+            description="Get all tasks in a sprint/list by code (e.g. LST-002269). Includes HTML description in text field.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "list_code": {
+                        "type": "string",
+                        "description": "Sprint/list code (e.g. LST-002269, SPR-000929)",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max tasks to return; default: all list members",
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "description": "Pagination offset",
+                        "default": 0,
+                    },
+                    "include_archived": {
+                        "type": "boolean",
+                        "description": "Include archived tasks",
+                        "default": False,
+                    },
+                },
+                "required": ["list_code"],
+            },
+        ),
+        Tool(
             name="eva_create_list",
             description="Create a new list/sprint/release (WARNING: write operation, requires read_only=False)",
             inputSchema={
@@ -292,7 +320,7 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "entity_code": {"type": "string", "description": "Filter by specific entity code"},
+                    "entity_code": {"type": "string", "description": "Filter by entity code or id (task/document/project). Entry content may be hidden by ACL."},
                     "limit": {"type": "integer", "description": "Maximum number of results", "default": 50},
                 },
             },
@@ -323,6 +351,7 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
             "eva_add_comment": eva_tools.add_comment,
             "eva_list_sprints": eva_tools.list_sprints,
             "eva_get_sprint": eva_tools.get_sprint_details,
+            "eva_get_tasks_by_list": eva_tools.get_tasks_by_list,
             "eva_create_list": eva_tools.create_list,
             "eva_get_audit_log": eva_tools.get_audit_log,
         }
