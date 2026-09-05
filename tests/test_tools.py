@@ -12,8 +12,11 @@ import json
 import pytest
 from fixtures import (
     AUDIT_ROW_DENIED,
+    CMF_PERSON,
     CMF_STATUS,
+    COMMENT_ID,
     COMMENT_ROW,
+    COMMENT_ROW_NEWER,
     DOCUMENT_CODE,
     DOCUMENT_ID,
     LIST_CODE,
@@ -303,6 +306,7 @@ def test_get_comments_accepts_document_parent(eva_tools, resolving_client):
 def test_add_comment_resolves_parent_to_id(eva_tools, resolving_client):
     """The API spec addresses a comment parent by entity id."""
     resolving_client.create_comment.return_value = {"id": COMMENT_ROW["id"]}
+    resolving_client.get_comment.return_value = COMMENT_ROW
 
     eva_tools.add_comment(parent_code=TASK_CODE, text="<p>Hi</p>")
 
@@ -441,6 +445,7 @@ def test_create_task_leaves_raw_html_alone(eva_tools, mock_client):
 def test_add_comment_repairs_double_escaped_html(eva_tools, resolving_client):
     """The same guard protects comment text."""
     resolving_client.create_comment.return_value = {"id": COMMENT_ROW["id"]}
+    resolving_client.get_comment.return_value = COMMENT_ROW
 
     eva_tools.add_comment(parent_code=TASK_CODE, text="&lt;p&gt;Hello&lt;/p&gt;")
 
@@ -462,3 +467,67 @@ def test_update_task_requires_a_field(eva_tools, mock_client):
 
     assert result_data["success"] is False
     mock_client.update_task.assert_not_called()
+
+
+# --- Comment bodies ----------------------------------------------------------
+
+
+def test_get_comments_asks_for_the_body(eva_tools, resolving_client):
+    """Without an explicit field list Eva returns no text at all.
+
+    The default CmfComment response carries id, parent, owner id and two nulls.
+    A caller can count comments with it and cannot read one, which is how a
+    thread stayed unreadable through MCP while `count` looked healthy.
+    """
+    resolving_client.list_comments.return_value = []
+
+    eva_tools.get_comments(TASK_CODE)
+
+    requested = resolving_client.list_comments.call_args.kwargs["fields"]
+    assert "text" in requested
+    assert "cmf_created_at" in requested
+    assert "cmf_owner" in requested
+
+
+def test_get_comments_returns_text_author_and_date(eva_tools, resolving_client):
+    """What the tool returns is what a reader needs to follow a discussion."""
+    resolving_client.list_comments.return_value = [COMMENT_ROW]
+
+    result = json.loads(eva_tools.get_comments(TASK_CODE))
+    comment = result["comments"][0]
+
+    assert comment["text"] == "<p>Test comment</p>"
+    assert comment["cmf_owner"]["name"] == CMF_PERSON["name"]
+    assert comment["cmf_created_at"]
+
+
+def test_get_comments_reads_oldest_first(eva_tools, resolving_client):
+    """A thread reads in the order it was written.
+
+    Eva is asked for the newest first, so that a `limit` keeps the most recent
+    comments rather than the oldest ones, and the page is then reversed so the
+    conversation still reads top to bottom.
+    """
+    resolving_client.list_comments.return_value = [COMMENT_ROW_NEWER, COMMENT_ROW]
+
+    result = json.loads(eva_tools.get_comments(TASK_CODE))
+
+    assert resolving_client.list_comments.call_args.kwargs["order_by"] == ["-cmf_created_at"]
+    dates = [c["cmf_created_at"] for c in result["comments"]]
+    assert dates == sorted(dates)
+
+
+def test_add_comment_returns_what_was_stored(eva_tools, resolving_client):
+    """Creating a comment answers with an id; the caller cannot check the text.
+
+    The tool reads the comment back so the response shows what Eva actually
+    kept — the same round trip that revealed HTML arriving escaped.
+    """
+    resolving_client.create_comment.return_value = COMMENT_ID
+    resolving_client.get_comment.return_value = COMMENT_ROW
+
+    result = json.loads(eva_tools.add_comment(parent_code=TASK_CODE, text="<p>Test comment</p>"))
+
+    assert result["success"] is True
+    assert result["comment"]["text"] == "<p>Test comment</p>"
+    resolving_client.get_comment.assert_called_once()
