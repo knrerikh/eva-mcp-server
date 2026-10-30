@@ -31,6 +31,9 @@ from fixtures import (
     TASK_DEFAULT_FIELDS,
     TASK_DETAILED,
     TASK_ID,
+    TIME_ENTRY_ID,
+    TIME_ENTRY_ROW,
+    TIME_ENTRY_RUNAWAY,
     filters_of,
 )
 
@@ -153,6 +156,12 @@ def test_search_tasks_combines_filters(eva_tools, resolving_client):
         (lambda t: t.get_comments(UNRESOLVABLE), "list_comments"),
         (lambda t: t.add_comment(parent_code=UNRESOLVABLE, text="<p>x</p>"), "create_comment"),
         (lambda t: t.get_audit_log(entity_code=UNRESOLVABLE), "list_audit"),
+        (
+            lambda t: t.log_time(
+                task_code=UNRESOLVABLE, start="2026-10-06T10:00:00+03:00", minutes=60
+            ),
+            "log_time",
+        ),
     ],
     ids=[
         "search_tasks-project",
@@ -163,6 +172,7 @@ def test_search_tasks_combines_filters(eva_tools, resolving_client):
         "get_comments-parent",
         "add_comment-parent",
         "get_audit_log-entity",
+        "log_time-task",
     ],
 )
 def test_unresolvable_code_fails_loudly(eva_tools, resolving_client, call_tool, guarded_method):
@@ -531,3 +541,115 @@ def test_add_comment_returns_what_was_stored(eva_tools, resolving_client):
     assert result["success"] is True
     assert result["comment"]["text"] == "<p>Test comment</p>"
     resolving_client.get_comment.assert_called_once()
+
+
+# --- Time tracking -----------------------------------------------------------
+
+
+@pytest.fixture
+def logging_client(resolving_client):
+    """Resolving client set up for a well-formed time entry round trip."""
+    resolving_client.get_current_user.return_value = CMF_PERSON
+    resolving_client.log_time.return_value = {"id": TIME_ENTRY_ID}
+    resolving_client.get_time_entry.return_value = TIME_ENTRY_ROW
+    return resolving_client
+
+
+def test_log_time_sends_task_id_minutes_and_utc_start(eva_tools, logging_client):
+    """The entry is addressed by task id, sized in minutes and dated in UTC.
+
+    The web client sends ``date`` as ``Date.toISOString()``; a local wall-clock
+    time sent without conversion would land the entry hours off.
+    """
+    result = json.loads(
+        eva_tools.log_time(task_code=TASK_CODE, start="2026-10-06T10:00:00+03:00", minutes=60)
+    )
+
+    assert result["success"] is True
+    kwargs = logging_client.log_time.call_args.kwargs
+    assert kwargs["task_id"] == TASK_ID
+    assert kwargs["time_spent"] == 60
+    assert kwargs["date"] == "2026-10-06T07:00:00.000Z"
+    assert kwargs["cmf_owner"] == PERSON_ID
+    assert kwargs["text"] == ""
+
+
+def test_log_time_defaults_owner_to_token_user(eva_tools, logging_client):
+    """Without ``user`` the entry belongs to whoever the token acts as."""
+    eva_tools.log_time(task_code=TASK_CODE, start="2026-10-06T10:00:00+03:00", minutes=60)
+
+    logging_client.get_current_user.assert_called_once()
+    assert logging_client.log_time.call_args.kwargs["cmf_owner"] == CMF_PERSON["id"]
+
+
+def test_log_time_resolves_explicit_user(eva_tools, logging_client):
+    """A login passed as ``user`` is resolved to a person id, not sent as text."""
+    eva_tools.log_time(
+        task_code=TASK_CODE, start="2026-10-06T10:00:00+03:00", minutes=60, user=PERSON_LOGIN
+    )
+
+    logging_client.get_current_user.assert_not_called()
+    assert logging_client.log_time.call_args.kwargs["cmf_owner"] == PERSON_ID
+
+
+def test_log_time_passes_description(eva_tools, logging_client):
+    """An optional description travels as the entry text."""
+    eva_tools.log_time(
+        task_code=TASK_CODE, start="2026-10-06T10:00:00+03:00", minutes=60, text="Release"
+    )
+
+    assert logging_client.log_time.call_args.kwargs["text"] == "Release"
+
+
+@pytest.mark.parametrize(
+    "start",
+    ["2026-10-06T10:00:00", "2026-10-06 10:00", "06.10.2026 10:00", "tomorrow"],
+)
+def test_log_time_rejects_start_without_offset(eva_tools, logging_client, start):
+    """A start without an explicit offset is refused before anything is written.
+
+    Guessing the zone would silently shift the entry by the server's offset.
+    """
+    result = json.loads(eva_tools.log_time(task_code=TASK_CODE, start=start, minutes=60))
+
+    assert result["success"] is False
+    logging_client.log_time.assert_not_called()
+
+
+@pytest.mark.parametrize("minutes", [0, -15, 24 * 60 + 1])
+def test_log_time_rejects_out_of_range_minutes(eva_tools, logging_client, minutes):
+    """Durations outside one day are refused before anything is written."""
+    result = json.loads(
+        eva_tools.log_time(task_code=TASK_CODE, start="2026-10-06T10:00:00+03:00", minutes=minutes)
+    )
+
+    assert result["success"] is False
+    logging_client.log_time.assert_not_called()
+
+
+def test_log_time_reads_entry_back(eva_tools, logging_client):
+    """The stored entry is read back and returned, so the caller sees what Eva kept."""
+    result = json.loads(
+        eva_tools.log_time(task_code=TASK_CODE, start="2026-10-06T10:00:00+03:00", minutes=60)
+    )
+
+    assert logging_client.get_time_entry.call_args.args[0] == TIME_ENTRY_ID
+    assert result["entry"]["id"] == TIME_ENTRY_ID
+    assert result["entry"]["time_spent"] == 60
+
+
+def test_log_time_reports_runaway_entry(eva_tools, logging_client):
+    """An entry whose end Eva stamped with 'now' is an error, not a success.
+
+    Such an entry cannot be shortened or deleted directly; the caller must be told
+    which one it is.
+    """
+    logging_client.get_time_entry.return_value = TIME_ENTRY_RUNAWAY
+
+    result = json.loads(
+        eva_tools.log_time(task_code=TASK_CODE, start="2026-10-06T10:00:00+03:00", minutes=60)
+    )
+
+    assert result["success"] is False
+    assert result["entry_id"] == TIME_ENTRY_ID
+    assert "35086" in result["error"]

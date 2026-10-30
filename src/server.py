@@ -312,6 +312,47 @@ async def list_tools() -> list[Tool]:
                 "required": ["parent_code", "text"],
             },
         ),
+        # Time tracking tools
+        Tool(
+            name="eva_log_time",
+            description=(
+                "Log time on a task: one entry from start for N minutes, read back to "
+                "confirm what Eva stored (WARNING: write operation, requires read_only=False)"
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "task_code": {
+                        "type": "string",
+                        "description": "Task code (e.g. 'IBE-225') or entity id",
+                    },
+                    "start": {
+                        "type": "string",
+                        "description": (
+                            "Start as ISO 8601 with an explicit offset, e.g. "
+                            "'2026-10-06T10:00:00+03:00'. A start without an offset is refused."
+                        ),
+                    },
+                    "minutes": {
+                        "type": "integer",
+                        "description": "Duration in minutes, 1 to 1440",
+                    },
+                    "text": {
+                        "type": "string",
+                        "description": "Optional entry description",
+                        "default": "",
+                    },
+                    "user": {
+                        "type": "string",
+                        "description": (
+                            "Login or person id the entry belongs to; defaults to the "
+                            "person the API token acts as"
+                        ),
+                    },
+                },
+                "required": ["task_code", "start", "minutes"],
+            },
+        ),
         # Sprint/List tools
         Tool(
             name="eva_list_sprints",
@@ -424,6 +465,7 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
             "eva_get_document": eva_tools.get_document_details,
             "eva_get_comments": eva_tools.get_comments,
             "eva_add_comment": eva_tools.add_comment,
+            "eva_log_time": eva_tools.log_time,
             "eva_list_sprints": eva_tools.list_sprints,
             "eva_get_sprint": eva_tools.get_sprint_details,
             "eva_get_tasks_by_list": eva_tools.get_tasks_by_list,

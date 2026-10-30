@@ -125,7 +125,17 @@ class EvaClient:
         Raises:
             EvaAPIError: If write operation is attempted in read-only mode
         """
-        write_operations = ["create", "update", "delete", "append", "set_", "do_"]
+        # timetracker_change_time writes a time entry, yet carries none of the
+        # usual verbs, so it is listed by name.
+        write_operations = [
+            "create",
+            "update",
+            "delete",
+            "append",
+            "set_",
+            "do_",
+            "timetracker_change_time",
+        ]
 
         if self.read_only and any(op in method.lower() for op in write_operations):
             raise EvaAPIError(
@@ -445,6 +455,54 @@ class EvaClient:
         }
         params.update(kwargs)
         return self.call("CmfComment.create", **params)
+
+    # Time tracking
+    def get_current_user(self) -> dict[str, Any]:
+        """Get the person the API token acts as."""
+        return self.call("CmfPerson.get_current_user")
+
+    def log_time(
+        self,
+        task_id: str,
+        time_spent: int,
+        date: str,
+        cmf_owner: str,
+        text: str = "",
+        remaining_estimate: int = 0,
+    ) -> dict[str, Any]:
+        """Log time on a task.
+
+        Goes through ``CmfTask.timetracker_change_time``, the method behind the
+        web client's "log time" button: it stores ``start = date`` and
+        ``end = start + time_spent``. ``CmfTimeTrackerHistory.create`` must not be
+        used instead — it stamps the end with the moment of saving, and the
+        resulting entry can be neither shortened nor deleted directly.
+
+        Args:
+            task_id: Task entity id (``CmfTask:<uuid>``), passed positionally
+            time_spent: Duration in minutes
+            date: Start in UTC, as the web client sends it: ``2026-10-06T07:00:00.000Z``
+            cmf_owner: Person entity id the entry belongs to
+            text: Entry description
+            remaining_estimate: Remaining estimate in minutes; the web client sends 0
+        """
+        return self.call(
+            "CmfTask.timetracker_change_time",
+            task_id,
+            time_spent=time_spent,
+            remaining_estimate=remaining_estimate,
+            text=text,
+            date=date,
+            cmf_owner=cmf_owner,
+        )
+
+    def get_time_entry(self, entry_id: str) -> dict[str, Any]:
+        """Get a time entry by id with the fields needed to check its duration."""
+        return self.call(
+            "CmfTimeTrackerHistory.get",
+            entry_id,
+            fields=["code", "start_date", "end_date", "time_spent", "parent.code"],
+        )
 
     # List/Sprint operations
     def get_list(self, code: str) -> dict[str, Any]:

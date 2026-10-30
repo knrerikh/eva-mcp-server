@@ -204,6 +204,12 @@ Add to your Claude Desktop configuration file (`claude_desktop_config.json`):
 - **eva_add_comment**: Add a comment (requires `read_only=false`)
   - Parameters: `parent_code`, `text`
 
+### Time Tracking Tools
+
+- **eva_log_time**: Log time on a task (requires `read_only=false`)
+  - Parameters: `task_code`, `start` (ISO 8601 with an offset), `minutes`, `text`, `user`
+  - Uses `CmfTask.timetracker_change_time` and reads the entry back. `CmfTimeTrackerHistory.create` is avoided on purpose: it stamps the end with the moment of saving, and such an entry can be neither shortened nor deleted directly.
+
 ### Sprint/List Tools
 
 - **eva_list_sprints**: List all sprints/lists

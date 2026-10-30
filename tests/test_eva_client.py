@@ -212,3 +212,57 @@ def test_context_manager(real_client):
         EvaClient(api_url="https://test.eva.com/api", api_token="test_token") as client,
     ):
         assert client.api_url == "https://test.eva.com/api"
+
+
+def test_read_only_protection_log_time(real_client):
+    """Logging time writes, although its method name carries no create/update verb."""
+    with pytest.raises(EvaAPIError, match="read-only mode"):
+        real_client.log_time(
+            task_id="CmfTask:abc",
+            time_spent=60,
+            date="2026-10-06T07:00:00.000Z",
+            cmf_owner="CmfPerson:p",
+        )
+
+
+@pytest.mark.asyncio
+async def test_log_time_calls_timetracker_change_time(real_client):
+    """Time goes through the task method the web client uses, task id positionally.
+
+    CmfTimeTrackerHistory.create stamps the end date with the moment of saving,
+    so it must not be the method used.
+    """
+    real_client.read_only = False
+    mock_response = Mock()
+    mock_response.json.return_value = {"result": {"id": "CmfTimeTrackerHistory:x"}}
+    mock_response.raise_for_status = Mock()
+
+    with patch.object(real_client.client, "post", return_value=mock_response) as post:
+        real_client.log_time(
+            task_id="CmfTask:abc",
+            time_spent=60,
+            date="2026-10-06T07:00:00.000Z",
+            cmf_owner="CmfPerson:p",
+            text="",
+        )
+
+    payload = post.call_args.kwargs["json"]
+    assert payload["method"] == "CmfTask.timetracker_change_time"
+    assert payload["args"] == ["CmfTask:abc"]
+    assert payload["kwargs"] == {
+        "time_spent": 60,
+        "remaining_estimate": 0,
+        "text": "",
+        "date": "2026-10-06T07:00:00.000Z",
+        "cmf_owner": "CmfPerson:p",
+    }
+
+
+@pytest.mark.asyncio
+async def test_get_time_entry_asks_for_verification_fields(real_client):
+    """The entry is read by id with the fields needed to check its duration."""
+    with patch.object(real_client, "call", return_value={"id": "CmfTimeTrackerHistory:x"}) as call:
+        real_client.get_time_entry("CmfTimeTrackerHistory:x")
+
+    assert call.call_args.args == ("CmfTimeTrackerHistory.get", "CmfTimeTrackerHistory:x")
+    assert set(call.call_args.kwargs["fields"]) >= {"start_date", "end_date", "time_spent"}
