@@ -1,5 +1,6 @@
 """MCP Tools for Eva API - Tool definitions for Model Context Protocol."""
 
+import datetime as dt
 import html
 import json
 import logging
@@ -683,6 +684,109 @@ class EvaTools:
                     "text arrived HTML-escaped and was unescaped before sending; " "pass raw HTML"
                 )
             return json.dumps(payload, ensure_ascii=False, indent=2)
+
+        except EvaAPIError as e:
+            return json.dumps(
+                {"success": False, "error": e.message, "code": e.code}, ensure_ascii=False, indent=2
+            )
+
+    # Time Tracking Tools
+
+    def log_time(
+        self,
+        task_code: str,
+        start: str,
+        minutes: int,
+        text: str = "",
+        user: str | None = None,
+    ) -> str:
+        """
+        Log time on a task.
+
+        WARNING: This is a write operation. Requires read_only=False.
+
+        Args:
+            task_code: Task code or entity id
+            start: Start as ISO 8601 with an explicit offset, e.g.
+                "2026-10-06T10:00:00+03:00". A start without an offset is
+                refused: guessing the zone would shift the entry silently.
+            minutes: Duration in minutes, 1 to 1440
+            text: Optional description
+            user: Login or person id the entry belongs to; defaults to the
+                person the API token acts as
+
+        Returns:
+            JSON string with the stored entry
+        """
+        try:
+            started = dt.datetime.fromisoformat(start)
+        except (TypeError, ValueError):
+            started = None
+        if started is None or started.tzinfo is None:
+            return json.dumps(
+                {
+                    "success": False,
+                    "error": f"start must be ISO 8601 with an offset, got {start!r}",
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        if not 0 < minutes <= 24 * 60:
+            return json.dumps(
+                {"success": False, "error": f"minutes must be 1..1440, got {minutes}"},
+                ensure_ascii=False,
+                indent=2,
+            )
+
+        try:
+            task_id = self.client.resolve_id(task_code, "CmfTask")
+            owner_id = (
+                self.client.resolve_id(user, "CmfPerson")
+                if user
+                else self.client.get_current_user()["id"]
+            )
+            date = started.astimezone(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+            created = self.client.log_time(
+                task_id=task_id, time_spent=minutes, date=date, cmf_owner=owner_id, text=text
+            )
+            entry_id = created.get("id") if isinstance(created, dict) else created
+
+            # Read back: an entry whose end was stamped with "now" looks like a
+            # success at creation and only shows itself in its stored duration.
+            entry = self.client.get_time_entry(entry_id)
+            stored_start = dt.datetime.fromisoformat(entry["start_date"])
+            stored_end = dt.datetime.fromisoformat(entry["end_date"])
+            span = int((stored_end - stored_start).total_seconds() // 60)
+            if stored_start != started or span != minutes or entry.get("time_spent") != minutes:
+                return json.dumps(
+                    {
+                        "success": False,
+                        "entry_id": entry_id,
+                        "entry": entry,
+                        "error": (
+                            f"entry stored as {entry['start_date']}..{entry['end_date']}, "
+                            f"time_spent {entry.get('time_spent')}, expected {minutes} min "
+                            f"from {start}. Such an entry cannot be shortened or deleted "
+                            "directly: move its start_date to a few minutes before now, "
+                            "then delete it."
+                        ),
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+
+            return json.dumps(
+                {
+                    "success": True,
+                    "task_id": task_id,
+                    "entry_id": entry_id,
+                    "entry": entry,
+                    "message": "Time logged successfully",
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
 
         except EvaAPIError as e:
             return json.dumps(

@@ -159,3 +159,31 @@ PROJECT_ROW = {
 def filters_of(mock_method):
     """Pull the filter list out of a recorded client call."""
     return mock_method.call_args.kwargs["filters"]
+
+
+# --- Time tracking -----------------------------------------------------------
+
+TIME_ENTRY_ID = "CmfTimeTrackerHistory:88888888-8888-8888-8888-888888888888"
+
+#: A logged time entry as CmfTimeTrackerHistory.get returns it with the
+#: verification fields asked for. Dates come back with the instance's offset,
+#: not in UTC; ``time_spent`` is in minutes and equals end minus start on a
+#: well-formed entry.
+TIME_ENTRY_ROW = {
+    "id": TIME_ENTRY_ID,
+    "class_name": "CmfTimeTrackerHistory",
+    "code": "TTH-000001",
+    "start_date": "2026-10-06T10:00:00+03:00",
+    "end_date": "2026-10-06T11:00:00+03:00",
+    "time_spent": 60,
+    "parent": {"id": TASK_ID, "class_name": "CmfTask", "code": TASK_CODE, "name": "Example task"},
+}
+
+#: The same entry as Eva leaves it when the end date is stamped with the moment
+#: of saving instead of start + time_spent: the duration runs to thousands of
+#: minutes. CmfTimeTrackerHistory.create produces this; the tool must report it.
+TIME_ENTRY_RUNAWAY = {
+    **TIME_ENTRY_ROW,
+    "end_date": "2026-10-30T18:46:29.471541+03:00",
+    "time_spent": 35086,
+}
