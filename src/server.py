@@ -324,7 +324,7 @@ async def list_tools() -> list[Tool]:
                 "properties": {
                     "task_code": {
                         "type": "string",
-                        "description": "Task code (e.g. 'IBE-225') or entity id",
+                        "description": "Task code (e.g. 'ACME-1') or entity id",
                     },
                     "start": {
                         "type": "string",
