@@ -471,6 +471,46 @@ def test_update_task_repairs_double_escaped_html(eva_tools, mock_client):
     assert mock_client.update_task.call_args.kwargs["text"] == "<p>Hello</p>"
 
 
+def test_get_task_details_appends_extra_fields(eva_tools, mock_client):
+    """Extra fields ride along with the default list, without duplicates."""
+    mock_client.get_task.return_value = TASK_DETAILED
+
+    eva_tools.get_task_details(TASK_CODE, extra_fields=["tags", "text"])
+
+    fields = mock_client.get_task.call_args.kwargs["fields"]
+    assert fields == TASK_DETAIL_FIELDS + ["tags"]
+
+
+def test_update_task_passes_raw_fields(eva_tools, mock_client):
+    """Raw fields reach Eva as is; a dedicated parameter wins on conflict."""
+    mock_client.update_task.return_value = TASK_ID
+
+    eva_tools.update_task(task_code=TASK_CODE, name="New", fields={"tags": ["a"], "name": "Old"})
+
+    kwargs = mock_client.update_task.call_args.kwargs
+    assert kwargs["tags"] == ["a"]
+    assert kwargs["name"] == "New"
+
+
+def test_find_tags_filters_by_name(eva_tools, mock_client):
+    """Tag names resolve through a case-insensitive name filter."""
+    mock_client.list_tags.return_value = [{"id": "CmfTag:1", "name": "stage_3.123"}]
+
+    result_data = json.loads(eva_tools.find_tags("stage_3.123"))
+
+    assert result_data["tags"][0]["id"] == "CmfTag:1"
+    filters = mock_client.list_tags.call_args.kwargs["filters"]
+    assert filters == [["name", "ILIKE", "%stage_3.123%"]]
+
+
+def test_create_tag_requires_a_name(eva_tools, mock_client):
+    """A blank tag name is refused rather than sent."""
+    result_data = json.loads(eva_tools.create_tag("  "))
+
+    assert result_data["success"] is False
+    mock_client.create_tag.assert_not_called()
+
+
 def test_update_task_requires_a_field(eva_tools, mock_client):
     """An update with nothing to change is refused rather than sent."""
     result_data = json.loads(eva_tools.update_task(task_code=TASK_CODE))
