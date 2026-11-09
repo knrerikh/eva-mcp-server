@@ -202,7 +202,9 @@ class EvaTools:
             JSON string with task details
         """
         try:
-            fields = TASK_DETAIL_FIELDS + [f for f in extra_fields or [] if f not in TASK_DETAIL_FIELDS]
+            fields = TASK_DETAIL_FIELDS + [
+                f for f in extra_fields or [] if f not in TASK_DETAIL_FIELDS
+            ]
             task = self.client.get_task(task_code, fields=fields)
 
             return json.dumps({"success": True, "task": task}, ensure_ascii=False, indent=2)

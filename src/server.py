@@ -438,7 +438,10 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "query": {"type": "string", "description": "Part of the tag name, case-insensitive"},
+                    "query": {
+                        "type": "string",
+                        "description": "Part of the tag name, case-insensitive",
+                    },
                     "limit": {
                         "type": "integer",
                         "description": "Maximum number of results",
