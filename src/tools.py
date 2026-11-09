@@ -188,18 +188,21 @@ class EvaTools:
                 {"success": False, "error": e.message, "code": e.code}, ensure_ascii=False, indent=2
             )
 
-    def get_task_details(self, task_code: str) -> str:
+    def get_task_details(self, task_code: str, extra_fields: list[str] | None = None) -> str:
         """
         Get detailed information about a specific task.
 
         Args:
             task_code: Task code/ID
+            extra_fields: Additional Eva fields to return. Eva silently ignores
+                unknown names, so check the response for the field itself.
 
         Returns:
             JSON string with task details
         """
         try:
-            task = self.client.get_task(task_code, fields=TASK_DETAIL_FIELDS)
+            fields = TASK_DETAIL_FIELDS + [f for f in extra_fields or [] if f not in TASK_DETAIL_FIELDS]
+            task = self.client.get_task(task_code, fields=fields)
 
             return json.dumps({"success": True, "task": task}, ensure_ascii=False, indent=2)
 
@@ -381,6 +384,7 @@ class EvaTools:
         responsible: str | None = None,
         status: str | None = None,
         priority: int | None = None,
+        fields: dict[str, Any] | None = None,
     ) -> str:
         """
         Update an existing task.
@@ -396,12 +400,14 @@ class EvaTools:
             responsible: New responsible user
             status: New task status
             priority: New task priority (0-5)
+            fields: Raw Eva fields sent as is, for fields without a dedicated
+                parameter (e.g. tags). Dedicated parameters win on conflict.
 
         Returns:
             JSON string with updated task details
         """
         try:
-            kwargs = {}
+            kwargs = dict(fields or {})
             repaired = False
             if name:
                 kwargs["name"] = name
@@ -749,6 +755,64 @@ class EvaTools:
                     indent=2,
                 )
             return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False, indent=2)
+
+    def find_tags(self, query: str, limit: int = 20) -> str:
+        """
+        Find tags by name.
+
+        Task updates link tags by entity id, so a tag name has to be resolved
+        here first.
+
+        Args:
+            query: Part of the tag name, case-insensitive
+            limit: Maximum number of results (default: 20)
+
+        Returns:
+            JSON string with matching tags
+        """
+        try:
+            tags = self.client.list_tags(filters=[["name", "ILIKE", f"%{query}%"]], limit=limit)
+
+            return json.dumps(
+                {"success": True, "count": len(tags), "tags": tags}, ensure_ascii=False, indent=2
+            )
+
+        except EvaAPIError as e:
+            return json.dumps(
+                {"success": False, "error": e.message, "code": e.code}, ensure_ascii=False, indent=2
+            )
+
+    def create_tag(self, name: str) -> str:
+        """
+        Create a tag.
+
+        WARNING: This is a write operation. Requires read_only=False.
+
+        Args:
+            name: Tag name
+
+        Returns:
+            JSON string with the created tag
+        """
+        try:
+            if not name or not name.strip():
+                raise ValueError("name is required")
+
+            created = self.client.create_tag(name.strip())
+
+            return json.dumps(
+                {"success": True, "tag": created, "message": "Tag created successfully"},
+                ensure_ascii=False,
+                indent=2,
+            )
+
+        except ValueError as e:
+            return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False, indent=2)
+
+        except EvaAPIError as e:
+            return json.dumps(
+                {"success": False, "error": e.message, "code": e.code}, ensure_ascii=False, indent=2
+            )
 
     def get_sprint_details(self, list_code: str) -> str:
         """

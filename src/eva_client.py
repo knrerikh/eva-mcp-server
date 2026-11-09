@@ -475,6 +475,29 @@ class EvaClient:
             params["fields"] = fields
         return self.call("CmfList.list", **params)
 
+    # Tag operations
+    def list_tags(
+        self,
+        filters: list[list[Any]] | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """List tags. Tasks link tags by ``CmfTag:<uuid>``; names are not accepted."""
+        params: dict[str, Any] = {
+            "slice": [offset, offset + limit],
+            "fields": ["id", "name", "code", "alias"],
+        }
+        if filters:
+            params["filter"] = filters
+        return self.call("CmfTag.list", **params)
+
+    def create_tag(self, name: str) -> Any:
+        """Create a tag.
+
+        NOTE: This is a write operation and will be blocked when read_only=True.
+        """
+        return self.call("CmfTag.create", name=name)
+
     # Audit operations
     def list_audit(
         self,

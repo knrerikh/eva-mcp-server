@@ -112,6 +112,11 @@ async def list_tools() -> list[Tool]:
                 "type": "object",
                 "properties": {
                     "task_code": {"type": "string", "description": "Task code/ID"},
+                    "extra_fields": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Additional Eva fields to return (e.g. ['tags']). Eva silently ignores unknown names.",
+                    },
                 },
                 "required": ["task_code"],
             },
@@ -184,6 +189,10 @@ async def list_tools() -> list[Tool]:
                     "responsible": {"type": "string", "description": "New responsible user"},
                     "status": {"type": "string", "description": "New task status"},
                     "priority": {"type": "integer", "description": "New task priority (0-5)"},
+                    "fields": {
+                        "type": "object",
+                        "description": "Raw Eva fields sent as is, for fields without a dedicated parameter. Relations take entity ids: tags are a full list of CmfTag ids (see eva_find_tags), and the list replaces the current tags.",
+                    },
                 },
                 "required": ["task_code"],
             },
@@ -381,6 +390,34 @@ async def list_tools() -> list[Tool]:
                 "required": ["name", "project_code"],
             },
         ),
+        # Tag tools
+        Tool(
+            name="eva_find_tags",
+            description="Find tags by name. Task updates link tags by entity id (CmfTag:...), so resolve names here first.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Part of the tag name, case-insensitive"},
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of results",
+                        "default": 20,
+                    },
+                },
+                "required": ["query"],
+            },
+        ),
+        Tool(
+            name="eva_create_tag",
+            description="Create a tag (WARNING: write operation, requires read_only=False)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Tag name"},
+                },
+                "required": ["name"],
+            },
+        ),
         # Audit tools
         Tool(
             name="eva_get_audit_log",
@@ -429,6 +466,8 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
             "eva_get_tasks_by_list": eva_tools.get_tasks_by_list,
             "eva_create_list": eva_tools.create_list,
             "eva_get_audit_log": eva_tools.get_audit_log,
+            "eva_find_tags": eva_tools.find_tags,
+            "eva_create_tag": eva_tools.create_tag,
         }
 
         if name not in tool_map:
